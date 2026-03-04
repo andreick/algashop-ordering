@@ -2,89 +2,79 @@
 
 Fundamentos de **Domain-Driven Design (DDD)** aplicados à implementação do domínio de um microsserviço.
 
----
-
 ## 📚 Índice
 
 1. [Introdução ao Domain-Driven Design](#introducao)
 2. [Entities (Domain Entities)](#entities)
 3. [Rich Domain Model vs Anemic Domain Model](#rich-vs-anemic)
 4. [Identificadores e UUIDs](#identificadores)
-5. [Regras de Negócio e Comportamento](#regras-negocio)
-6. [Validações e Encapsulamento](#validacoes)
-7. [Exceções de Domínio](#excecoes)
-8. [Value Objects (Futuro)](#value-objects)
-9. [Factories (Futuro)](#factories)
-10. [Aplicação Prática no Projeto](#aplicacao-pratica)
+5. [Value Objects](#value-objects)
+6. [Regras de Negócio e Comportamento](#regras-negocio)
+7. [Validações e Encapsulamento](#validacoes)
+8. [Exceções de Domínio](#excecoes)
+9. [Factories](#factories)
 
----
+## <a name="introducao"></a>1. Introdução ao Domain-Driven Design
 
-## <a name="introducacao"></a>1. Introdução ao Domain-Driven Design
-
-**Domain-Driven Design** é uma metodologia proposta por Eric Evans que coloca o **domínio do negócio** no centro da arquitetura de software. Em vez de pensarmos em entidades apenas como tabelas de banco de dados ou estruturas de dados, pensamos em **objetos que representam conceitos importantes do negócio e que encapsulam regras de negócio**.
+**Domain-Driven Design** é uma metodologia proposta por Eric Evans que coloca o **domínio do negócio** no centro da arquitetura de software. Entidades não são apenas tabelas de banco ou estruturas de dados, mas **objetos que representam conceitos do negócio e encapsulam suas regras**.
 
 ### Pilares do DDD
 
-- **Domain Entity**: Objeto com identidade única que persiste ao longo do tempo
+- **Domain Entity**: Objeto com identidade única e ciclo de vida
 - **Value Object**: Objeto sem identidade, definido por seus atributos
-- **Aggregate**: Grupo de entidades e value objects tratados como uma unidade
+- **Aggregate**: Grupo de entidades e value objects tratados como unidade
 - **Factory**: Padrão para criar objetos complexos
 - **Repository**: Abstração para persistência
 - **Domain Service**: Lógica que não pertence a nenhuma entidade específica
 - **Domain Exception**: Exceções que representam violações de regras de negócio
-
----
 
 ## <a name="entities"></a>2. Entities (Domain Entities)
 
 ### O que é uma Domain Entity?
 
 Uma **Domain Entity** é um objeto que:
-- Possui uma **identidade única** que persiste ao longo do tempo (mesmo que seus atributos mudem)
+- Possui **identidade única** que persiste ao longo do tempo
 - Tem um **ciclo de vida** definido no domínio
-- Sofre **mudanças de estado**
 - **Encapsula regras de negócio** relacionadas ao conceito que representa
-- Possui **comportamentos** específicos do domínio
-- É responsável por manter a **integridade dos dados** que possui
+- Possui **comportamentos** específicos do domínio (não apenas getters/setters)
+- É responsável por manter a **integridade dos dados**
 
 ### Exemplo: Customer Entity
-
-Nossa `Customer` é uma Domain Entity que representa um cliente no domínio de pedidos:
 
 ```java
 @Accessors(fluent = true)
 @Getter
 public class Customer {
-
-    private UUID id;  // ← IDENTIDADE ÚNICA
-    private String fullName;
-    private LocalDate birthDate;
-    private String email;
-    private String phone;
-    private String document;
+    private CustomerId id;                         // ← Identidade única
+    private FullName fullName;
+    private BirthDate birthDate;
+    private Email email;
+    private Phone phone;
+    private Document document;
+    private Boolean isPromotionNotificationsAllowed;
     private Boolean isArchived;
-    private Integer loyaltyPoints;  // ← REGRA DE NEGÓCIO
     private OffsetDateTime registeredAt;
     private OffsetDateTime archivedAt;
+    private LoyaltyPoints loyaltyPoints;
+    private Address address;
 
-    // Comportamentos específicos do domínio
-    public void addLoyaltyPoints(Integer loyaltyPointsAdded) { ... }
+    // Comportamentos do domínio
+    public void addLoyaltyPoints(LoyaltyPoints loyaltyPointsAdded) { ... }
     public void archive() { ... }
-    public void enablePromotionNotifications() { ... }
-    // ...
+    public void changeName(FullName fullName) { ... }
 }
 ```
 
-### Características importantes:
+### Identidade e Igualdade
 
-**1. Identidade única (UUID)**
+Dois clientes são iguais se possuem o **mesmo ID**, independentemente de seus atributos:
+
 ```java
 @Override
 public boolean equals(Object o) {
-    if (o == null || getClass() != o.getClass())
-        return false;
+    if (o == null || getClass() != o.getClass()) return false;
     Customer customer = (Customer) o;
-    return Objects.equals(id, customer.id);  // Igualdade por ID
+    return Objects.equals(id, customer.id);
 }
 
 @Override
@@ -92,152 +82,133 @@ public int hashCode() {
     return Objects.hashCode(id);
 }
 ```
-Dois clientes são iguais se tiverem o **mesmo ID**, independentemente de seus atributos.
 
-**2. Comportamentos que representam ações do negócio**
+### Comportamentos Encapsulam Lógica de Negócio
+
 ```java
 public void archive() {
-    verifyIfChangeable();  // Regra: não pode arquivar cliente já arquivado
+    verifyIfChangeable();  // Regra: cliente não pode estar arquivado
     this.setIsArchived(true);
     this.setArchivedAt(OffsetDateTime.now());
-    // Dados sensíveis são anonimizados
-    this.setFullName("Anonymous");
-    this.setEmail(UUID.randomUUID() + "@anonymous.com");
-    // ...
+    // Anonimiza dados pessoais
+    this.setFullName(new FullName("Anonymous", "Customer"));
+    this.setPhone(new Phone("000-000-0000"));
+    this.setDocument(new Document("000-00-0000"));
+    this.setEmail(new Email(UUID.randomUUID() + "@anonymous.com"));
+    this.setBirthDate(null);
+    this.setIsPromotionNotificationsAllowed(false);
+    this.setAddress(this.address.toBuilder()
+            .number("Anonymized")
+            .complement(null).build());
 }
 ```
 
----
+O método `archive()` não apenas marca o cliente como arquivado, mas também **anonimiza os dados pessoais**, demonstrando como a lógica de negócio complexa fica encapsulada na entidade.
 
 ## <a name="rich-vs-anemic"></a>3. Rich Domain Model vs Anemic Domain Model
 
 ### ❌ Anemic Domain Model (Anti-padrão)
 
-Uma entidade **anêmica** é basicamente um "data holder" com getters e setters públicos:
+Entidade anêmica é um "data holder" com getters/setters públicos:
 
 ```java
 // ❌ NÃO FAÇA ASSIM
 @Entity
 public class Customer {
-    @Id
-    private UUID id;
+    @Id private UUID id;
     private String fullName;
     private String email;
-
-    // Apenas getters e setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    
+    // Apenas getters/setters públicos
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
-    // ... mais getters/setters
 }
 
-// A lógica fica em classes de serviço
+// Lógica espalhada em serviços
 @Service
 public class CustomerService {
     public void archive(Customer customer) {
-        if (customer.getIsArchived()) {
-            throw new Exception("Already archived");
-        }
         customer.setIsArchived(true);
         customer.setFullName("Anonymous");
-        // ...
+        // ... lógica espalhada
     }
 }
 ```
 
 **Problemas:**
 - Lógica de negócio espalhada em serviços
-- Difícil de testar (precisa mockar o contexto todo)
-- Não há validações garantidas
+- Difícil de testar isoladamente
 - Fácil violar regras de negócio acidentalmente
+- Não há garantia de validações
 
 ### ✅ Rich Domain Model (Padrão recomendado)
 
-Uma entidade **rica** encapsula regras de negócio e dados:
+Entidade rica encapsula regras de negócio e dados:
 
 ```java
 // ✅ FAÇA ASSIM
-@Accessor(fluent = true)
+@Accessors(fluent = true)
 @Getter
 public class Customer {
-
-    private UUID id;
-    private String fullName;
+    private CustomerId id;
+    private FullName fullName;
+    private Email email;
     private Boolean isArchived;
 
-    // Setters privados (controlam acesso)
-    private void setId(UUID id) {
-        Objects.requireNonNull(id);
-        this.id = id;
-    }
-
-    private void setFullName(String fullName) {
+    // Setters privados (controle interno)
+    private void setFullName(FullName fullName) {
         Objects.requireNonNull(fullName);
-        if (fullName.isBlank()) {
-            throw new IllegalArgumentException("Name cannot be blank");
-        }
         this.fullName = fullName;
     }
 
-    // Comportamentos com regras de negócio encapsuladas
+    // Comportamentos públicos (expressam intenção)
     public void archive() {
-        verifyIfChangeable();  // Valida a regra
+        verifyIfChangeable();
         this.setIsArchived(true);
-        this.setFullName("Anonymous");
+        this.setArchivedAt(OffsetDateTime.now());
+        this.setFullName(new FullName("Anonymous", "Customer"));
+        // ... anonimização completa
     }
 
-    private void verifyIfChangeable() {
-        if (Boolean.TRUE.equals(this.isArchived)) {
-            throw new CustomerArchivedException();
-        }
+    public void changeName(FullName fullName) {
+        verifyIfChangeable();
+        this.setFullName(fullName);
     }
 }
 ```
 
 **Benefícios:**
 - ✅ Regras de negócio sempre mantidas
-- ✅ Fácil de testar (testa diretamente a entidade)
+- ✅ Fácil de testar diretamente
 - ✅ Código autoexplicativo
-- ✅ Seguro (não há como violar as regras)
-
-### Nossa implementação é Rich Domain Model ✅
-
-Observe em `Customer.java`:
-- Getters públicos (fluent, sem "get" prefix)
-- **Setters privados** - você não pode mexer nos dados diretamente
-- Métodos públicos representam **ações do negócio**: `archive()`, `addLoyaltyPoints()`, `changeName()`
-
----
+- ✅ Validações garantidas pelos Value Objects
 
 ## <a name="identificadores"></a>4. Identificadores e UUIDs
 
-### Por que não usar ID seriais simples?
+### Por que não usar IDs seriais?
 
-Em um microsserviço, não sabemos quantas instâncias teremos ou como serão distribuídas. IDs seriais criam problemas:
+Em microsserviços distribuídos, IDs seriais criam problemas:
 
 - ❌ Contenção em banco de dados (bottleneck)
 - ❌ Difícil sincronizar entre shards
 - ❌ Revela informações sobre volume de dados
-- ❌ Problema se dados forem replicados
+- ❌ Problema em replicação de dados
 
-### UUID v7 (Time-Based Epoch Random) - Solução adotada
+### UUID v7 (Time-Based Epoch Random)
 
 ```java
 public class IdGenerator {
-
-    private static final TimeBasedEpochRandomGenerator timeBasedEpochRandomGenerator =
+    private static final TimeBasedEpochRandomGenerator generator =
         Generators.timeBasedEpochRandomGenerator();
 
     public static UUID generateTimeBasedUUID() {
-        return timeBasedEpochRandomGenerator.generate();
+        return generator.generate();
     }
 }
 ```
 
 **UUID v7 combina o melhor dos dois mundos:**
 
-✅ **Ordenáveis por tempo** (primeiros 48 bits = timestamp)
 ```
 ┌─────────────────────┬───────────────────────────────┐
 │   Timestamp (48b)   │  Random (80b)                 │
@@ -246,193 +217,288 @@ public class IdGenerator {
 └────────────────────────────────────────────────────┘
 ```
 
-✅ **Distribuído** - gerado no cliente sem coordenação  
-✅ **Pragmático** - bom desempenho em índices  
-✅ **Determinístico** - mesma hora + seed = mesmo ID (testável)  
+✅ **Ordenáveis por tempo** (primeiros 48 bits = timestamp)  
+✅ **Distribuído** (gerado no cliente sem coordenação)  
+✅ **Pragmático** (bom desempenho em índices B-tree)  
+✅ **Determinístico** (testável com seed fixo)  
 
-### Como é usado no projeto
+## <a name="value-objects"></a>5. Value Objects
 
-No construtor da `Customer`:
+### Conceito
+
+Um **Value Object** é um objeto que:
+- **Não possui identidade única** - é definido por seus atributos
+- É **imutável** - não muda após criação
+- Representa um **conceito do domínio** (Email, Phone, Address)
+- Pode conter **comportamentos e validações** (LoyaltyPoints.add())
+
+### Implementação com Java Records
+
+O projeto utiliza **Java Records** para Value Objects de forma concisa:
+
+#### Email (validação simples)
 
 ```java
-// Criação de um novo Cliente
-Customer customer = new Customer(
-    IdGenerator.generateTimeBasedUUID(),  // ← Gera UUID v7
-    "João Silva",
-    LocalDate.of(1990, 5, 15),
-    "joao@email.com",
-    "11-9999-9999",
-    "123.456.789-00",
-    true,  // Quer receber promoções?
-    OffsetDateTime.now()
-);
+public record Email(String value) {
+    public Email {
+        FieldValidations.requiresValidEmail(value, 
+            ErrorMessages.VALIDATION_ERROR_EMAIL_IS_INVALID);
+    }
+
+    @Override
+    public String toString() {
+        return value;
+    }
+}
 ```
 
----
+**Características:**
+- ✅ Validação automática no construtor compacto
+- ✅ Imutável por padrão (record)
+- ✅ `equals()`, `hashCode()` gerados automaticamente
 
-## <a name="regras-negocio"></a>5. Regras de Negócio e Comportamento
+#### FullName (validação e normalização)
 
-As regras de negócio vivem nas **entidades de domínio**, não em serviços ou repositórios.
+```java
+public record FullName(String firstName, String lastName) {
+    public FullName {
+        firstName = FieldValidations.requiresNonBlank(firstName).trim();
+        lastName = FieldValidations.requiresNonBlank(lastName).trim();
+    }
+
+    @Override
+    public String toString() {
+        return firstName + " " + lastName;
+    }
+}
+```
+
+#### LoyaltyPoints (com comportamento)
+
+```java
+public record LoyaltyPoints(@NonNull Integer value) 
+        implements Comparable<LoyaltyPoints> {
+    
+    public static final LoyaltyPoints ZERO = new LoyaltyPoints(0);
+
+    public LoyaltyPoints() {
+        this(0);
+    }
+
+    public LoyaltyPoints {
+        if (value < 0) {
+            throw new IllegalArgumentException(
+                ErrorMessages.VALIDATION_ERROR_LOYALTY_POINTS_IS_NEGATIVE);
+        }
+    }
+
+    public LoyaltyPoints add(@NonNull LoyaltyPoints points) {
+        return add(points.value());
+    }
+
+    public LoyaltyPoints add(@NonNull Integer value) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(
+                ErrorMessages.VALIDATION_ERROR_LOYALTY_POINTS_IS_ZERO_OR_NEGATIVE);
+        }
+        return new LoyaltyPoints(this.value() + value);
+    }
+
+    @Override
+    public int compareTo(LoyaltyPoints o) {
+        return this.value().compareTo(o.value());
+    }
+}
+```
+
+**Características especiais:**
+- ✅ Constante `ZERO` para casos comuns
+- ✅ Construtor padrão (zero pontos)
+- ✅ Método `add()` com validação de regra de negócio
+- ✅ Implementa `Comparable` para ordenação
+
+#### CustomerId (identidade como VO)
+
+```java
+public record CustomerId(@NonNull UUID value) {
+    public CustomerId() {
+        this(IdGenerator.generateTimeBasedUUID());
+    }
+
+    @Override
+    public String toString() {
+        return value.toString();
+    }
+}
+```
+
+**Encapsula a lógica de geração de IDs** - ao criar `new CustomerId()`, gera automaticamente UUID v7.
+
+#### Address (VO complexo)
+
+```java
+@Builder(toBuilder = true)
+public record Address(
+        @NonNull String street,
+        String complement,
+        @NonNull String neighborhood,
+        @NonNull String number,
+        @NonNull String city,
+        @NonNull String state,
+        @NonNull ZipCode zipCode) {
+    
+    public Address {
+        street = FieldValidations.requiresNonBlank(street).trim();
+        neighborhood = FieldValidations.requiresNonBlank(neighborhood).trim();
+        number = FieldValidations.requiresNonBlank(number).trim();
+        city = FieldValidations.requiresNonBlank(city).trim();
+        state = FieldValidations.requiresNonBlank(state).trim();
+    }
+}
+```
+
+**Características especiais:**
+- ✅ Composto por múltiplos atributos
+- ✅ Contém outro Value Object (`ZipCode`)
+- ✅ `@Builder` para facilitar criação
+- ✅ `toBuilder()` permite criar cópias modificadas (preserva imutabilidade)
+
+### Benefícios dos Value Objects
+
+✅ **Type Safety** - compilador previne erros (não pode passar `Phone` onde espera `Email`)  
+✅ **Validação Encapsulada** - impossível criar VO inválido  
+✅ **Semântica Clara** - código autoexplicativo (`FullName` vs `String`)  
+✅ **Reutilização** - mesmos VOs em múltiplas entidades  
+✅ **Testabilidade** - testa validações isoladamente  
+✅ **Imutabilidade** - records são imutáveis por natureza  
+
+### Quando Usar Value Objects?
+
+- ✅ Atributo com **validações específicas** (Email, Phone, CPF)
+- ✅ Conceito do **domínio** (Address, Money)
+- ✅ Atributo **compartilhado** entre entidades
+- ✅ Quer **type safety** (evitar misturar primitivos)
+
+## <a name="regras-negocio"></a>6. Regras de Negócio e Comportamento
+
+Regras de negócio vivem nas **entidades de domínio**, não em serviços.
 
 ### Exemplo 1: Adicionar Pontos de Lealdade
 
 ```java
-public void addLoyaltyPoints(Integer loyaltyPointsAdded) {
+public void addLoyaltyPoints(LoyaltyPoints loyaltyPointsAdded) {
     verifyIfChangeable();  // REGRA: Cliente não pode estar arquivado
-
-    // REGRA: Não pode adicionar pontos negativos
-    if (loyaltyPointsAdded <= 0) {
-        throw new IllegalArgumentException(
-            ErrorMessages.VALIDATION_ERROR_LOYALTY_POINTS_IS_NEGATIVE
-        );
-    }
-
-    // Cálculo de pontos (mais uma regra de negócio)
-    this.setLoyaltyPoints(this.loyaltyPoints() + loyaltyPointsAdded);
+    this.setLoyaltyPoints(this.loyaltyPoints.add(loyaltyPointsAdded));
 }
 ```
 
-**Fluxo de teste:**
-```java
-@Test
-void testAddLoyaltyPoints() {
-    Customer customer = createCustomer();
+**Note:**
+- Recebe `LoyaltyPoints` (VO), não `Integer`
+- Validação de pontos negativos encapsulada no VO
+- Método `add()` do VO também valida (não aceita zero/negativo)
 
-    // ✅ Caso válido
-    customer.addLoyaltyPoints(100);
-    assertEquals(100, customer.loyaltyPoints());
-
-    // ❌ Pontos negativos não permitidos
-    assertThrows(IllegalArgumentException.class,
-        () -> customer.addLoyaltyPoints(-50)
-    );
-}
-```
-
-### Exemplo 2: Arquivamento (Regra complexa)
-
-```java
-public void archive() {
-    // REGRA 1: Não pode arquivar cliente já arquivado
-    verifyIfChangeable();
-
-    // REGRA 2: Arquivado significa mudança de estado
-    this.setIsArchived(true);
-    this.setArchivedAt(OffsetDateTime.now());
-
-    // REGRA 3: Anonimização de dados sensíveis
-    this.setFullName("Anonymous");
-    this.setPhone("000-000-0000");
-    this.setDocument("000-00-0000");
-    this.setEmail(UUID.randomUUID() + "@anonymous.com");
-    this.setBirthDate(null);  // Apaga data de nascimento
-    this.setIsPromotionNotificationsAllowed(false);  // Desativa notificações
-}
-```
-
-**Por que isso é regra de negócio?**
-- Define como um cliente é removido do sistema (com privacidade)
-- Garante consistência dos dados após arquivamento
-- Centralizado em um único lugar (a entidade)
-
-### Exemplo 3: Controle de Notificações
+### Exemplo 2: Controle de Notificações
 
 ```java
 public void enablePromotionNotifications() {
-    verifyIfChangeable();  // Regra: cliente não arquivado
+    verifyIfChangeable();
     this.setIsPromotionNotificationsAllowed(true);
 }
 
 public void disablePromotionNotifications() {
-    verifyIfChangeable();  // Regra: cliente não arquivado
+    verifyIfChangeable();
     this.setIsPromotionNotificationsAllowed(false);
 }
 ```
 
-Comportamento explícito: em vez de expor `setIsPromotionNotificationsAllowed()`, expor métodos que declaram intenção de negócio.
+Métodos expressam **intenção de negócio** ao invés de expor `setIsPromotionNotificationsAllowed()`.
 
----
+## <a name="validacoes"></a>7. Validações e Encapsulamento
 
-## <a name="validacoes"></a>6. Validações e Encapsulamento
+### Validação Encapsulada em Value Objects
 
-### Validação através de Setters Privados
-
-Todos os setters em `Customer` são **privados** e implementam validações:
+**Cada Value Object valida a si mesmo** no construtor:
 
 ```java
-private void setFullName(String fullName) {
-    Objects.requireNonNull(fullName,
-        ErrorMessages.VALIDATION_ERROR_FULLNAME_IS_NULL);
-
-    if (fullName.isBlank()) {
-        throw new IllegalArgumentException(
-            ErrorMessages.VALIDATION_ERROR_FULLNAME_IS_BLANK);
+// Email - validação no construtor
+public record Email(String value) {
+    public Email {
+        FieldValidations.requiresValidEmail(value, 
+            ErrorMessages.VALIDATION_ERROR_EMAIL_IS_INVALID);
     }
+}
 
-    this.fullName = fullName;
+// BirthDate - regra de negócio encapsulada
+public record BirthDate(@NonNull LocalDate value) {
+    public BirthDate {
+        if (value.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException(
+                ErrorMessages.VALIDATION_ERROR_BIRTHDATE_FROM_FUTURE);
+        }
+    }
 }
 ```
 
-**Garantia:** Nunca será possível ter um `fullName` null ou blank após criar a entidade.
-
-### Validação de Email
-
-Usando um validador reutilizável:
+### Na Entidade: Setters Apenas Verificam Non-Null
 
 ```java
-// Em FieldValidations.java
-public static void requiresValidEmail(String email, String errorMessage) {
-    if (!EmailValidator.getInstance().isValid(email)) {
-        throw new IllegalArgumentException(errorMessage);
-    }
-}
-
-// Em Customer.java
-private void setEmail(String email) {
-    FieldValidations.requiresValidEmail(email,
-        ErrorMessages.VALIDATION_ERROR_EMAIL_IS_INVALID);
+private void setEmail(Email email) {
+    Objects.requireNonNull(email);  // Email já foi validado no VO
     this.email = email;
 }
-```
 
-### Validação de Data de Nascimento
-
-```java
-private void setBirthDate(LocalDate birthDate) {
-    if (birthDate == null) {
-        this.birthDate = null;  // Permitido ser nulo
-        return;
-    }
-
-    // Regra: data de nascimento não pode ser no futuro
-    if (birthDate.isAfter(LocalDate.now())) {
-        throw new IllegalArgumentException(
-            ErrorMessages.VALIDATION_ERROR_BIRTHDATE_IN_FUTURE);
-    }
-
+private void setBirthDate(BirthDate birthDate) {
+    // Pode ser null (campo opcional)
     this.birthDate = birthDate;
 }
 ```
 
----
+**Garantia:** É **impossível** criar um Value Object inválido.
 
-## <a name="excecoes"></a>7. Exceções de Domínio
+### Validações Reutilizáveis
 
-Exceções de domínio representam **violações de regras de negócio** específicas.
+```java
+public class FieldValidations {
+    public static String requiresNonBlank(@NonNull String value) {
+        if (value.isBlank()) {
+            throw new IllegalArgumentException("Value cannot be blank");
+        }
+        return value;
+    }
 
-### Hierarquia de Exceções
+    public static String requiresValidEmail(@NonNull String email, String errorMessage) {
+        if (!EmailValidator.getInstance().isValid(email)) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+        return email;
+    }
+}
+```
+
+### Vantagens
+
+✅ **Single Responsibility** - cada VO valida apenas a si  
+✅ **Fail Fast** - erro no momento da criação  
+✅ **Reusabilidade** - VOs usados em múltiplas entidades  
+✅ **Type Safety** - compilador previne erros  
+✅ **Testabilidade** - testa validações isoladamente  
+
+## <a name="excecoes"></a>8. Exceções de Domínio
+
+Exceções de domínio representam **violações de regras de negócio**.
+
+### Hierarquia
 
 ```
-Exception
-    └── DomainException (base para toda excessão de negócio)
+RuntimeException
+    └── DomainException
         └── CustomerArchivedException
 ```
 
-### DomainException Base
+### DomainException (Base)
 
 ```java
 public class DomainException extends RuntimeException {
-
     public DomainException(String message) {
         super(message);
     }
@@ -444,26 +510,22 @@ public class DomainException extends RuntimeException {
 ```
 
 **Estende RuntimeException** porque:
-- São exceções esperadas e previstas em lógica de negócio
-- O código cliente deve tratar especificamente
-- Não devemos obrigar declaração em throws
+- São exceções esperadas em lógica de negócio
+- Código cliente trata especificamente
+- Não obriga declaração em `throws`
 
 ### CustomerArchivedException
 
 ```java
 public class CustomerArchivedException extends DomainException {
-
     public CustomerArchivedException() {
         super(ErrorMessages.ERROR_CUSTOMER_ARCHIVED);
-    }
-
-    public CustomerArchivedException(Throwable cause) {
-        super(ErrorMessages.ERROR_CUSTOMER_ARCHIVED, cause);
     }
 }
 ```
 
-**Usada quando:**
+**Uso:**
+
 ```java
 private void verifyIfChangeable() {
     if (Boolean.TRUE.equals(this.isArchived)) {
@@ -472,303 +534,187 @@ private void verifyIfChangeable() {
 }
 ```
 
-### ErrorMessages - Single Source of Truth
+### ErrorMessages (Single Source of Truth)
 
 ```java
 public class ErrorMessages {
-
-    public static final String VALIDATION_ERROR_EMAIL_IS_INVALID =
+    public static final String VALIDATION_ERROR_EMAIL_IS_INVALID = 
         "Email is invalid";
-
-    public static final String VALIDATION_ERROR_FULLNAME_IS_BLANK =
-        "FullName cannot be blank";
-
-    public static final String ERROR_CUSTOMER_ARCHIVED =
+    public static final String ERROR_CUSTOMER_ARCHIVED = 
         "Customer is archived it cannot be changed";
 
-    private ErrorMessages() {  // Não instanciável
-    }
+    private ErrorMessages() {}  // Não instanciável
 }
 ```
 
-**Benefício:** Todas as mensagens em um único lugar, fácil traduzir ou mudar.
+**Benefício:** Mensagens centralizadas, fácil traduzir ou alterar.
 
----
-
-## <a name="value-objects"></a>8. Value Objects
-
-### Conceito: O que é um Value Object?
-
-Um **Value Object** é um objeto que:
-- **Não possui identidade única**
-- É definido **pelos seus atributos**
-- É **imutável** (não muda após criação)
-- Implementa `equals()` e `hashCode()` baseado em **todos os atributos**
-- Pode fazer parte de uma entidade ou ser usado como um tipo de dado
-- Pode ser composto por outros Value Objects
-- Não existe fora do contexto de uma entidade (não tem ciclo de vida próprio)
-- Dados e comportamento relacionados a um conceito específico do domínio
-- Pode ter regras de negócio e validações próprias
-
-### Exemplo futuro: Email como Value Object
-
-```java
-// ✓ RECOMENDADO (futuro)
-@Value  // Lombok - torna imutável
-public class Email {
-    String address;
-
-    public Email(String address) {
-        if (!EmailValidator.getInstance().isValid(address)) {
-            throw new IllegalArgumentException("Invalid email");
-        }
-        this.address = address;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) return false;
-        Email email = (Email) o;
-        // Igualdade por valor (conteúdo), não por referência
-        return Objects.equals(address, email.address);
-    }
-
-    @Override
-    public int hashCode() {
-        return address.hashCode();
-    }
-}
-
-// Uso na Customer:
-public class Customer {
-    private Email email;  // Value Object, não String
-
-    private void setEmail(Email email) {  // Já validado no VO
-        this.email = email;
-    }
-}
-```
-
-### Benefícios:
-
-✅ **Validação encapsulada** - Email sempre válido se objeto existe  
-✅ **Type safety** - compilador garante que é Email, não String  
-✅ **Semântica clara** - código explicita: "isto é um Email"  
-✅ **Reutilizável** - Email pode ser usado em outras entidades (Supplier, Employee, etc)  
-✅ **Testável** - testa validação do VO separadamente  
-
-### Quando implementar Value Objects:
-
-- Quando um atributo tem **validações específicas**
-- Quando um atributo é **compartilhado** entre entidades
-- Quando um atributo tem **comportamento associado**
-- Quando ganham **semântica clara** com um nome próprio
-
----
-
-## <a name="factories"></a>9. Factories (Padrão de Criação)
+## <a name="factories"></a>9. Factories
 
 ### Conceito
 
-Uma **Factory** encapsula a lógica complexa de criar objetos, especialmente quando:
-- A criação envolve **múltiplas etapas**
-- Há **variações** do mesmo objeto
-- A criação requer **dados de outras fontes**
+**Factory** encapsula lógica complexa de criação quando:
+- Criação envolve múltiplas etapas
+- Há variações do mesmo objeto
+- Criação requer contextos diferentes
 
-### Exemplo futuro: CustomerFactory
+### Implementação com Builder e Static Factory Methods
+
+**Lombok @Builder** com **Static Factory Methods**:
+
+#### Na Entidade Customer
 
 ```java
-public class CustomerFactory {
-
-    private final IdGenerator idGenerator;
-    private final EmailValidator emailValidator;
-
-    // Factory Method para criação padrão
-    public Customer createNewCustomer(
-            String fullName,
-            LocalDate birthDate,
-            String email,
-            String phone,
-            String document) {
-
+@Accessors(fluent = true)
+@Getter
+public class Customer {
+    // Builder para NOVO cliente
+    @Builder(builderClassName = "BrandNewCustomerBuild", builderMethodName = "brandNew")
+    private static Customer createBrandNew(
+            FullName fullName, BirthDate birthDate, Email email,
+            Phone phone, Document document, 
+            Boolean promotionNotificationsAllowed, Address address) {
         return new Customer(
-            idGenerator.generateTimeBasedUUID(),
-            fullName,
-            birthDate,
-            email,
-            phone,
-            document,
-            false,  // Por padrão não quer notificações
-            OffsetDateTime.now()
-        );
+                new CustomerId(),              // Gera UUID v7
+                fullName, birthDate, email, phone, document,
+                promotionNotificationsAllowed,
+                false,                         // Não arquivado
+                OffsetDateTime.now(),          // Registrado agora
+                null,                          // Sem data arquivamento
+                LoyaltyPoints.ZERO,            // Pontos = 0
+                address);
     }
 
-    // Factory Method para criar import de legacy
-    public Customer importFromLegacySystem(LegacyCustomerDTO legacy) {
-        return new Customer(
-            UUID.fromString(legacy.getId()),
-            legacy.getName(),
-            legacy.getBirthDate(),
-            legacy.getEmail(),
-            legacy.getPhone(),
-            legacy.getDocument(),
-            legacy.acceptsEmails(),
-            legacy.isActive() ? null : OffsetDateTime.now(),
-            OffsetDateTime.parse(legacy.getCreatedAt()),
-            legacy.isActive() ? null : OffsetDateTime.parse(legacy.getArchivedAt()),
-            legacy.getPoints()
-        );
-    }
-
-    // Factory Method para reconstituir do banco
-    public Customer reconstructFromDatabase(CustomerRow row) {
-        return new Customer(
-            UUID.fromString(row.id),
-            row.fullName,
-            row.birthDate,
-            row.email,
-            row.phone,
-            row.document,
-            row.isPromotionNotificationsAllowed,
-            row.isArchived,
-            row.registeredAt,
-            row.archivedAt,
-            row.loyaltyPoints
-        );
+    // Builder para cliente EXISTENTE (reconstituição)
+    @Builder(builderClassName = "ExistingCustomerBuild", builderMethodName = "existing")
+    private Customer(CustomerId id, FullName fullName, /* ... todos campos ... */) {
+        // Inicializa todos os campos
     }
 }
 ```
 
-### Uso da Factory
+### Uso dos Builders
+
+#### Criar Novo Cliente
 
 ```java
-// Criação nova
-Customer newCustomer = customerFactory.createNewCustomer(
-    "Maria", LocalDate.of(1995, 3, 10), "maria@email.com",
-    "11-99999-9999", "123.456.789-00"
-);
+Customer customer = Customer.brandNew()
+    .fullName(new FullName("John", "Doe"))
+    .birthDate(new BirthDate(LocalDate.of(1991, 7, 5)))
+    .email(new Email("johndoe@email.com"))
+    .phone(new Phone("478-256-2604"))
+    .document(new Document("255-08-0578"))
+    .promotionNotificationsAllowed(true)
+    .address(Address.builder()
+            .street("Bourbon Street")
+            .number("1134")
+            .neighborhood("North Ville")
+            .city("York")
+            .state("South California")
+            .zipCode(new ZipCode("12345"))
+            .build())
+    .build();
+// ID, registeredAt, loyaltyPoints são preenchidos automaticamente
+```
 
-// Importação de legacy
-Customer legacyCustomer = customerFactory.importFromLegacySystem(legacyData);
+#### Reconstituir Cliente Existente
 
-// Reconstituição do banco
-Customer fromDb = customerFactory.reconstructFromDatabase(row);
+```java
+Customer customer = Customer.existing()
+    .id(new CustomerId(UUID.fromString("...")))
+    .fullName(new FullName("John", "Doe"))
+    // ... todos os campos ...
+    .loyaltyPoints(new LoyaltyPoints(150))
+    .build();
+// Controle total - útil para reconstituição do banco
+```
+
+### Test Data Builders
+
+Para testes, criamos builders pré-configurados:
+
+```java
+public class CustomerTestDataBuilder {
+    public static Customer.BrandNewCustomerBuild brandNewCustomer() {
+        return Customer.brandNew()
+                .fullName(new FullName("John", "Doe"))
+                .birthDate(new BirthDate(LocalDate.of(1991, 7, 5)))
+                .email(new Email("johndoe@email.com"))
+                .phone(new Phone("478-256-2604"))
+                .document(new Document("255-08-0578"))
+                .promotionNotificationsAllowed(true)
+                .address(Address.builder()
+                        .street("Bourbon Street")
+                        .number("1134")
+                        .neighborhood("North Ville")
+                        .city("York")
+                        .state("South California")
+                        .zipCode(new ZipCode("12345"))
+                        .build());
+    }
+}
+```
+
+**Uso em testes:**
+
+```java
+@Test
+void testAddLoyaltyPoints() {
+    Customer customer = CustomerTestDataBuilder.brandNewCustomer().build();
+    
+    customer.addLoyaltyPoints(new LoyaltyPoints(10));
+    
+    assertThat(customer.loyaltyPoints()).isEqualTo(new LoyaltyPoints(10));
+}
 ```
 
 ### Benefícios
 
-✅ **Clareza** - métodos bem nomeados explicam o contexto  
-✅ **Flexibilidade** - adicionar novo tipo de criação é fácil  
-✅ **Reutilização** - evita código duplicado em repositórios  
-✅ **Evolução** - mudar lógica de criação em um lugar  
-
----
-
-## <a name="aplicacao-pratica"></a>10. Aplicação Prática no Projeto
-
-### Estrutura de pastas
-
-```
-domain/
-├── entity/
-│   └── Customer.java           ← DOMAIN ENTITY (Rich Model)
-├── exception/
-│   ├── DomainException.java    ← Base para exceções de domínio
-│   ├── CustomerArchivedException.java
-│   └── ErrorMessages.java      ← Single source of truth para mensagens
-├── validator/
-│   └── FieldValidations.java   ← Reutilizável validações
-├── utility/
-│   └── IdGenerator.java        ← Gera UUIDs v7
-└── README.md  (este arquivo)
-```
-
-### Como testar entidade de domínio
-
-```java
-class CustomerTest {
-
-    @Test
-    void shouldCreateValidCustomer() {
-        // Arrange
-        UUID id = IdGenerator.generateTimeBasedUUID();
-        LocalDate birthDate = LocalDate.of(1990, 5, 15);
-
-        // Act
-        Customer customer = new Customer(
-            id, "John Doe", birthDate, "john@example.com",
-            "11-99999-9999", "123.456.789-00", true,
-            OffsetDateTime.now()
-        );
-
-        // Assert - Invariantes garantidos
-        assertEquals("John Doe", customer.fullName());
-        assertEquals(0, customer.loyaltyPoints());
-        assertFalse(customer.isArchived());
-    }
-
-    @Test
-    void shouldNotAllowNullName() {
-        assertThrows(NullPointerException.class, () -> {
-            new Customer(UUID.randomUUID(), null,
-                LocalDate.now(), "email@test.com",
-                "phone", "doc", true, OffsetDateTime.now());
-        });
-    }
-
-    @Test
-    void shouldThrowExceptionWhenArchivedCustomerIsModified() {
-        Customer customer = createArchivedCustomer();
-
-        assertThrows(CustomerArchivedException.class, () -> {
-            customer.addLoyaltyPoints(50);
-        });
-    }
-
-    @Test
-    void shouldAnonimizeDataWhenArchived() {
-        Customer customer = createCustomer(
-            "Original Name", "original@email.com"
-        );
-
-        customer.archive();
-
-        assertEquals("Anonymous", customer.fullName());
-        assertTrue(customer.email().contains("anonymous.com"));
-        assertNull(customer.birthDate());
-    }
-}
-```
-
----
-
-## 📖 Referências
-
-- **Domain-Driven Design** - Eric Evans
-- **Implementing Domain-Driven Design** - Vaughn Vernon
-- **Building Microservices** - Sam Newman
-- [RFC 4122 - Universally Unique Identifier](https://datatracker.ietf.org/doc/html/rfc4122)
-- [UUID v7 Specification Draft](https://datatracker.ietf.org/doc/html/draft-ietf-uuidrev-rfc4122bis)
-
----
+✅ **Clareza Semântica** - `brandNew()` vs `existing()` expressa intenção  
+✅ **Type Safety** - compilador garante campos necessários  
+✅ **Conveniente** - menos parâmetros para novo cliente  
+✅ **Flexível** - `existing()` permite controle total  
+✅ **Testabilidade** - Test Data Builders simplificam testes  
 
 ## 📝 Notas de Implementação
 
-### Por que não usamos JPA `@Entity` nesta camada?
+### Por que não usar JPA `@Entity` na camada de domínio?
 
 ```java
 // ❌ NÃO MISTURAR
 @Entity  // ← Jakarta Persistence
-@Accessors(fluent = true)
-@Getter
-public class Customer {
-    @Id private UUID id;
-    // ...
-}
+public class Customer { /* ... */ }
 ```
 
 **Razão:** Domain Entity e Persistence Entity têm responsabilidades diferentes:
-- **Domain Entity**: Modela conceitos de negócio
-- **Persistence Entity**: Mapeia entidade para tabela de banco
+- **Domain Entity**: Modela negócio, comportamentos e regras
+- **Persistence Entity**: Mapeia para banco de dados
 
-Isso mantém o domínio independente do framework de persistência.
+Isso mantém o domínio **independente do framework de persistência**.
+
+### Por que Records para Value Objects?
+
+Java Records (Java 14+) são perfeitos para VOs:
+- ✅ Imutáveis por padrão (`final`)
+- ✅ `equals()` e `hashCode()` automáticos
+- ✅ Construtor compacto (validações inline)
+- ✅ Menos boilerplate
+- ✅ Semântica clara ("data carriers")
+
+## 🎯 Resumo dos Padrões
+
+| Padrão | Implementação | Benefício |
+|--------|---------------|-----------|
+| **Rich Domain Model** | `Customer` com métodos | Lógica centralizada |
+| **Value Objects** | Records (Email, FullName) | Type safety + Validação |
+| **Builder Pattern** | Lombok `@Builder` | Construção fluente |
+| **Static Factory Method** | `brandNew()` e `existing()` | Intenção clara |
+| **Test Data Builder** | `CustomerTestDataBuilder` | Testes simplificados |
+| **Domain Exceptions** | `CustomerArchivedException` | Erros específicos |
+| **Fluent Interface** | `@Accessors(fluent = true)` | API expressiva |
+| **Single Source of Truth** | `ErrorMessages` | Mensagens centralizadas |
+| **Fail Fast** | Validação no construtor | Detecção precoce |
+
+---
+
+**📚 Este documento evolui junto com o projeto. Última atualização:** Março 2026
