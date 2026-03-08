@@ -60,6 +60,10 @@ public class OrderTestDataBuilder {
                 order.markAsPaid();
             }
             case READY -> {
+                // to reach READY we need to place, pay and then mark as ready
+                order.place();
+                order.markAsPaid();
+                order.markAsReady();
             }
             case CANCELED -> {
             }
