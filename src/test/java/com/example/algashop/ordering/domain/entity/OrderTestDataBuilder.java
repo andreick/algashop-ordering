@@ -66,6 +66,8 @@ public class OrderTestDataBuilder {
                 order.markAsReady();
             }
             case CANCELED -> {
+                // simply cancel the order allowed from any prior status
+                order.cancel();
             }
         }
 

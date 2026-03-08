@@ -276,4 +276,26 @@ class OrderTest {
         ThrowingCallable changeShipping = () -> order.changeShipping(OrderTestDataBuilder.aShippingAlt());
         Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changeShipping);
     }
+
+    @Test
+    void givenOrderInVariousStates_whenCancel_shouldMoveToCanceledAndRecordDate() {
+        for (OrderStatus state : java.util.Arrays.asList(OrderStatus.DRAFT, OrderStatus.PLACED, OrderStatus.PAID,
+                OrderStatus.READY)) {
+            Order order = OrderTestDataBuilder.anOrder().status(state).build();
+            order.cancel();
+            Assertions.assertThat(order.isCanceled()).isTrue();
+            Assertions.assertThat(order.status()).isEqualTo(OrderStatus.CANCELED);
+            Assertions.assertThat(order.canceledAt()).isNotNull();
+        }
+    }
+
+    @Test
+    void givenCanceledOrder_whenCancelAgain_shouldThrowAndKeepState() {
+        Order order = OrderTestDataBuilder.anOrder().status(OrderStatus.CANCELED).build();
+        java.time.OffsetDateTime before = order.canceledAt();
+        Assertions.assertThatExceptionOfType(OrderStatusCannotBeChangedException.class)
+                .isThrownBy(order::cancel);
+        Assertions.assertThat(order.status()).isEqualTo(OrderStatus.CANCELED);
+        Assertions.assertThat(order.canceledAt()).isEqualTo(before);
+    }
 }
