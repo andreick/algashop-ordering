@@ -9,10 +9,13 @@ Fundamentos de **Domain-Driven Design (DDD)** aplicados à implementação do do
 3. [Rich Domain Model vs Anemic Domain Model](#rich-vs-anemic)
 4. [Identificadores e UUIDs](#identificadores)
 5. [Value Objects](#value-objects)
-6. [Regras de Negócio e Comportamento](#regras-negocio)
-7. [Validações e Encapsulamento](#validacoes)
-8. [Exceções de Domínio](#excecoes)
-9. [Factories](#factories)
+6. [Agregados e Aggregate Root](#agregados)
+7. [Regras de Negócio e Comportamento](#regras-negocio)
+8. [Validações e Encapsulamento](#validacoes)
+9. [Exceções de Domínio](#excecoes)
+10. [Princípios de Tamanho e Consistência](#invariantes)
+11. [Factories e Builders](#factories)
+12. [Transações e Coordenação entre Agregados](#transacoes)
 
 ## <a name="introducao"></a>1. Introdução ao Domain-Driven Design
 
@@ -143,7 +146,7 @@ public class CustomerService {
 
 ### ✅ Rich Domain Model (Padrão recomendado)
 
-Entidade rica encapsula regras de negócio e dados:
+Entidade rica encapsula regras de negócio e dados com **setters privados** e **métodos comportamentais públicos**:
 
 ```java
 // ✅ FAÇA ASSIM
@@ -161,17 +164,17 @@ public class Customer {
         this.fullName = fullName;
     }
 
-    // Comportamentos públicos (expressam intenção)
+    // Comportamentos públicos (expressam intenção de negócio)
     public void archive() {
-        verifyIfChangeable();
+        verifyIfChangeable();  // Valida regra
         this.setIsArchived(true);
         this.setArchivedAt(OffsetDateTime.now());
+        // ... anonimização
         this.setFullName(new FullName("Anonymous", "Customer"));
-        // ... anonimização completa
     }
 
     public void changeName(FullName fullName) {
-        verifyIfChangeable();
+        verifyIfChangeable();  // Valida regra
         this.setFullName(fullName);
     }
 }
@@ -179,22 +182,26 @@ public class Customer {
 
 **Benefícios:**
 - ✅ Regras de negócio sempre mantidas
-- ✅ Fácil de testar diretamente
-- ✅ Código autoexplicativo
-- ✅ Validações garantidas pelos Value Objects
+- ✅ Impossível deixar entidade em estado inválido
+- ✅ Código autoexplicativo (intenção clara)
+- ✅ Fácil de testar isoladamente
 
 ## <a name="identificadores"></a>4. Identificadores e UUIDs
 
-### Por que não usar IDs seriais?
+### Por que evitar IDs seriais em microsserviços?
 
-Em microsserviços distribuídos, IDs seriais criam problemas:
+Em sistemas distribuídos, depender de IDs incrementais costuma gerar gargalos e acoplamento com o banco de dados. Na prática, isso traz alguns efeitos colaterais:
 
-- ❌ Contenção em banco de dados (bottleneck)
-- ❌ Difícil sincronizar entre shards
-- ❌ Revela informações sobre volume de dados
-- ❌ Problema em replicação de dados
+- ❌ Maior contenção no banco (ponto único para geração de ID)
+- ❌ Dificuldade de escalar entre shards e múltiplas instâncias
+- ❌ Exposição indireta de volume/crescimento de dados
+- ❌ Mais atrito em cenários de replicação e sincronização
+
+Por isso, o domínio usa identificadores gerados na aplicação, com boa ordenação temporal e baixa colisão.
 
 ### UUID v7 (Time-Based Epoch Random)
+
+No projeto, o `IdGenerator` encapsula essa geração:
 
 ```java
 public class IdGenerator {
@@ -207,7 +214,7 @@ public class IdGenerator {
 }
 ```
 
-**UUID v7 combina o melhor dos dois mundos:**
+O UUID v7 combina previsibilidade temporal com aleatoriedade:
 
 ```
 ┌─────────────────────┬───────────────────────────────┐
@@ -217,10 +224,18 @@ public class IdGenerator {
 └────────────────────────────────────────────────────┘
 ```
 
-✅ **Ordenáveis por tempo** (primeiros 48 bits = timestamp)  
-✅ **Distribuído** (gerado no cliente sem coordenação)  
-✅ **Pragmático** (bom desempenho em índices B-tree)  
-✅ **Determinístico** (testável com seed fixo)  
+✅ **Ordenável por tempo**: melhora a localidade em índices (ex.: B-tree)  
+✅ **Distribuído**: pode ser gerado na aplicação, sem coordenador central  
+✅ **Escalável**: reduz acoplamento com infraestrutura de persistência  
+✅ **Prático para testes**: a estratégia fica centralizada no `IdGenerator`  
+
+### Nota sobre Estratégias de ID
+
+O domínio não usa uma única estratégia para todos os agregados. A escolha varia conforme o contexto:
+- **CustomerId, ProductId** → UUID v7 (Time-Based Epoch Random)
+- **OrderId, OrderItemId** → TSID (Time-based Sequential ID)
+
+Ambas são abordagens **distribuídas** e **ordenáveis temporalmente**. O objetivo é preservar desempenho de escrita/leitura em índices e evitar dependência de um gerador central no banco.
 
 ## <a name="value-objects"></a>5. Value Objects
 
@@ -317,6 +332,93 @@ public record LoyaltyPoints(@NonNull Integer value)
 - ✅ Método `add()` com validação de regra de negócio
 - ✅ Implementa `Comparable` para ordenação
 
+#### Money (valor monetário)
+
+```java
+public record Money(@NonNull BigDecimal value) implements Comparable<Money> {
+
+    private static final RoundingMode roundingMode = RoundingMode.HALF_EVEN;
+
+    public static final Money ZERO = new Money(BigDecimal.ZERO);
+
+    public Money(String value) {
+        this(new BigDecimal(value));
+    }
+
+    public Money {
+        value = value.setScale(2, roundingMode);
+        if (value.signum() == -1) {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    public Money multiply(@NonNull Quantity quantity) {
+        if (quantity.value() < 1) {
+            throw new IllegalArgumentException();
+        }
+        BigDecimal multiplied = this.value.multiply(new BigDecimal(quantity.value()));
+        return new Money(multiplied);
+    }
+
+    public Money add(@NonNull Money money) {
+        return new Money(this.value.add(money.value));
+    }
+
+    @Override
+    public String toString() {
+        return value.toString();
+    }
+
+    @Override
+    public int compareTo(Money o) {
+        return this.value.compareTo(o.value);
+    }
+}
+```
+
+**Características especiais:**
+- ✅ Usa `BigDecimal` para precisão monetária (evita erros de ponto flutuante)
+- ✅ Sempre com 2 casas decimais (`setScale(2, ...)`)
+- ✅ Rejeita valores negativos (invariante: dinheiro não pode ser negativo)
+- ✅ Método `multiply()` com `Quantity` para cálculos corretos
+- ✅ Operações matemáticas retornam novo `Money` (imutabilidade)
+- ✅ Comparável para ordenações e validações
+
+#### Quantity (quantidade de itens)
+
+```java
+public record Quantity(@NonNull Integer value) implements Serializable, Comparable<Quantity> {
+
+    public static final Quantity ZERO = new Quantity(0);
+
+    public Quantity {
+        if (value < 0) {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    public Quantity add(@NonNull Quantity quantity) {
+        return new Quantity(this.value + quantity.value());
+    }
+
+    @Override
+    public String toString() {
+        return String.valueOf(value);
+    }
+
+    @Override
+    public int compareTo(Quantity o) {
+        return this.value.compareTo(o.value());
+    }
+}
+```
+
+**Características especiais:**
+- ✅ Quantidade nunca é negativa
+- ✅ Método `add()` combina quantidades
+- ✅ Comparável para validações
+- ✅ Implementa `Serializable` para persistência
+
 #### CustomerId (identidade como VO)
 
 ```java
@@ -379,9 +481,124 @@ public record Address(
 - ✅ Atributo **compartilhado** entre entidades
 - ✅ Quer **type safety** (evitar misturar primitivos)
 
-## <a name="regras-negocio"></a>6. Regras de Negócio e Comportamento
+## <a name="agregados"></a>6. Agregados e Aggregate Root
 
-Regras de negócio vivem nas **entidades de domínio**, não em serviços.
+### Conceito
+
+Um **Aggregate** é um grupo de classes (entidades e value objects) tratados como **unidade indivisível** onde:
+- ✅ A integridade de dados é consistente
+- ✅ Transações envolvem apenas este agregado
+- ✅ Regras de negócio são sempre mantidas
+
+A **Aggregate Root** é a entidade que:
+- É o **ponto de entrada único** para modificações
+- **Garante a integridade** de todos os objetos dentro dela
+- **Encapsula as regras** que envolvem múltiplos objetos
+
+### Exemplo: Order como Aggregate Root
+
+```java
+@Accessors(fluent = true)
+@Getter
+public class Order {
+    private OrderId id;                    // Identidade única
+    private CustomerId customerId;         // Referência a outro agregado (por ID)
+    private Set<OrderItem> items;          // Entidades internas
+    private Money totalAmount;
+    private Quantity totalItems;
+    private Billing billing;
+    private Shipping shipping;
+    private OrderStatus status;
+    // ... mais campos e timestamps
+
+    public void addItem(@NonNull ProductId productId, @NonNull ProductName productName,
+                        @NonNull Money price, @NonNull Quantity quantity) {
+        // Validações que afetam o agregado
+        OrderItem orderItem = OrderItem.brandNew()
+                .orderId(this.id())
+                .productId(productId)
+                .productName(productName)
+                .price(price)
+                .quantity(quantity)
+                .build();
+        this.items.add(orderItem);
+        this.recalculateTotals();  // ← Garante consistência
+    }
+
+    public void place() {
+        verifyIfCanChangeToPlaced();  // Valida invariantes
+        this.setPlacedAt(OffsetDateTime.now());
+        this.changeStatus(OrderStatus.PLACED);
+    }
+
+    public Set<OrderItem> items() {
+        return Collections.unmodifiableSet(this.items);  // Imutável
+    }
+}
+```
+
+### Características e Proteções
+
+**1. Uma Única Raiz:** `Order` é acessada diretamente. `OrderItem` nunca é acessada via repositório próprio—sempre através de `Order.
+
+**2. Integridade de Regras:** Toda modificação passa pela raiz:
+```java
+// ✅ CORRETO
+order.addItem(productId, productName, price, quantity);  // Passa validações
+
+// ❌ ERRADO
+order.items().add(orderItem);  // Tentativa falha (Unmodifiable)
+```
+
+**3. Referências Apenas por ID:** Agregados independentes se referenciam por ID, não por objeto direto:
+```java
+private CustomerId customerId;  // ✅ Referência em ID
+// private Customer customer;   // ❌ Nunca isto
+```
+
+**4. Collections Sempre Imutáveis:** Retorna views imutáveis para proteger integridade:
+```java
+public Set<OrderItem> items() {
+    return Collections.unmodifiableSet(this.items);
+}
+```
+
+### Invariantes Garantidos
+
+Um agregado mantém condições que **sempre devem ser verdadeiras**:
+
+```java
+// INVARIANTE: Totais sempre sincronizados
+private void recalculateTotals() {
+    // totalAmount = Sum(item.totalAmount)
+    Money total = items.stream()
+        .map(OrderItem::totalAmount)
+        .reduce(Money.ZERO, Money::add);
+    this.totalAmount = total;
+}
+
+// INVARIANTE: Data de entrega sempre no futuro
+public void changeShipping(@NonNull Shipping newShipping) {
+    if (newShipping.expectedDate().isBefore(LocalDate.now())) {
+        throw new OrderInvalidShippingDeliveryDateException(this.id());
+    }
+    this.shipping = newShipping;
+}
+
+// INVARIANTE: Apenas certos estados de transição são permitidos
+public void place() {
+    if (!this.isDraft()) {
+        throw new OrderCannotBePlacedException(this.id());
+    }
+    // ... transição de status
+}
+```
+
+**Garantia:** É **impossível** deixar um agregado em estado inválido.
+
+## <a name="regras-negocio"></a>7. Regras de Negócio e Comportamento
+
+Regras de negócio vivem nas **entidades de domínio**, não em serviços. Exemplos:
 
 ### Exemplo 1: Adicionar Pontos de Lealdade
 
@@ -391,33 +608,51 @@ public void addLoyaltyPoints(LoyaltyPoints loyaltyPointsAdded) {
     this.setLoyaltyPoints(this.loyaltyPoints.add(loyaltyPointsAdded));
 }
 ```
+**Nota:** O `LoyaltyPoints` VO também valida (não aceita zero/negativo).
 
-**Note:**
-- Recebe `LoyaltyPoints` (VO), não `Integer`
-- Validação de pontos negativos encapsulada no VO
-- Método `add()` do VO também valida (não aceita zero/negativo)
-
-### Exemplo 2: Controle de Notificações
+### Exemplo 2: Adicionar Item ao Pedido
 
 ```java
-public void enablePromotionNotifications() {
-    verifyIfChangeable();
-    this.setIsPromotionNotificationsAllowed(true);
-}
-
-public void disablePromotionNotifications() {
-    verifyIfChangeable();
-    this.setIsPromotionNotificationsAllowed(false);
+public void addItem(@NonNull ProductId productId, 
+                    @NonNull ProductName productName,
+                    @NonNull Money price, 
+                    @NonNull Quantity quantity) {
+    OrderItem orderItem = OrderItem.brandNew()
+            .orderId(this.id())
+            .productId(productId)
+            .productName(productName)
+            .price(price)
+            .quantity(quantity)
+            .build();
+    this.items.add(orderItem);
+    this.recalculateTotals();  // REGRA: Totais sempre atualizados
 }
 ```
 
-Métodos expressam **intenção de negócio** ao invés de expor `setIsPromotionNotificationsAllowed()`.
+### Exemplo 3: Controle de Status
 
-## <a name="validacoes"></a>7. Validações e Encapsulamento
+```java
+public void place() {
+    // REGRA: Apenas pedidos em DRAFT podem ser colocados
+    if (!this.isDraft()) {
+        throw new OrderCannotBePlacedException(this.id());
+    }
+    // REGRA: Deve ter pelo menos um item
+    if (this.items == null || this.items.isEmpty()) {
+        throw new OrderDoesNotContainOrderItemException(this.id());
+    }
+    this.setPlacedAt(OffsetDateTime.now());
+    this.changeStatus(OrderStatus.PLACED);
+}
+```
+
+**Padrão:** Métodos com nomes expressivos (`place()`, `markAsPaid()`) expressam **intenção de negócio**.
+
+## <a name="validacoes"></a>8. Validações e Encapsulamento
 
 ### Validação Encapsulada em Value Objects
 
-**Cada Value Object valida a si mesmo** no construtor:
+**Cada Value Object valida a si mesmo** no construtor compacto:
 
 ```java
 // Email - validação no construtor
@@ -428,7 +663,7 @@ public record Email(String value) {
     }
 }
 
-// BirthDate - regra de negócio encapsulada
+// BirthDate - regra de negócio
 public record BirthDate(@NonNull LocalDate value) {
     public BirthDate {
         if (value.isAfter(LocalDate.now())) {
@@ -439,84 +674,31 @@ public record BirthDate(@NonNull LocalDate value) {
 }
 ```
 
-### Na Entidade: Setters Apenas Verificam Non-Null
-
+**Na entidade, setters apenas verificam non-null:**
 ```java
 private void setEmail(Email email) {
-    Objects.requireNonNull(email);  // Email já foi validado no VO
+    Objects.requireNonNull(email);  // Email já foi validado
     this.email = email;
 }
-
-private void setBirthDate(BirthDate birthDate) {
-    // Pode ser null (campo opcional)
-    this.birthDate = birthDate;
-}
 ```
 
-**Garantia:** É **impossível** criar um Value Object inválido.
+**Benefícios:**
+- ✅ **Fail-Fast** - erro no momento da criação
+- ✅ **Single Responsibility** - cada VO valida a si
+- ✅ **Reusabilidade** - VOs usados em múltiplas entidades
+- ✅ **Type Safety** - compilador previne erros  
 
-### Validações Reutilizáveis
+## <a name="excecoes"></a>9. Exceções de Domínio
 
-```java
-public class FieldValidations {
-    public static String requiresNonBlank(@NonNull String value) {
-        if (value.isBlank()) {
-            throw new IllegalArgumentException("Value cannot be blank");
-        }
-        return value;
-    }
-
-    public static String requiresValidEmail(@NonNull String email, String errorMessage) {
-        if (!EmailValidator.getInstance().isValid(email)) {
-            throw new IllegalArgumentException(errorMessage);
-        }
-        return email;
-    }
-}
-```
-
-### Vantagens
-
-✅ **Single Responsibility** - cada VO valida apenas a si  
-✅ **Fail Fast** - erro no momento da criação  
-✅ **Reusabilidade** - VOs usados em múltiplas entidades  
-✅ **Type Safety** - compilador previne erros  
-✅ **Testabilidade** - testa validações isoladamente  
-
-## <a name="excecoes"></a>8. Exceções de Domínio
-
-Exceções de domínio representam **violações de regras de negócio**.
-
-### Hierarquia
-
-```
-RuntimeException
-    └── DomainException
-        └── CustomerArchivedException
-```
-
-### DomainException (Base)
+Exceções de domínio representam **violações de regras de negócio** e estendem `DomainException`:
 
 ```java
 public class DomainException extends RuntimeException {
     public DomainException(String message) {
         super(message);
     }
-
-    public DomainException(String message, Throwable cause) {
-        super(message, cause);
-    }
 }
-```
 
-**Estende RuntimeException** porque:
-- São exceções esperadas em lógica de negócio
-- Código cliente trata especificamente
-- Não obriga declaração em `throws`
-
-### CustomerArchivedException
-
-```java
 public class CustomerArchivedException extends DomainException {
     public CustomerArchivedException() {
         super(ErrorMessages.ERROR_CUSTOMER_ARCHIVED);
@@ -524,8 +706,7 @@ public class CustomerArchivedException extends DomainException {
 }
 ```
 
-**Uso:**
-
+**Uso em verificações:**
 ```java
 private void verifyIfChangeable() {
     if (Boolean.TRUE.equals(this.isArchived)) {
@@ -534,58 +715,68 @@ private void verifyIfChangeable() {
 }
 ```
 
-### ErrorMessages (Single Source of Truth)
+**Vantagem:** `ErrorMessages` centraliza mensagens para fácil tradução/manutenção.
+
+## <a name="invariantes"></a>10. Princípios de Tamanho e Consistência
+
+### Conceitos Essenciais
+
+- **Invariante:** Condição que **deve ser sempre verdadeira** dentro de um agregado
+- **Consistency Boundary:** Limite onde os invariantes são garantidos (= o agregado)
+- **Transactional Boundary:** Uma transação deve envolver **apenas um agregado**
+
+### Decisão: Mantendo Order Pequena
+
+```
+Order Aggregate (coeso e testável):
+├── Order (raiz)
+├── OrderItem (interno) ← Sempre carregados juntos
+├── Money, Quantity (VOs)
+├── Billing, Shipping (VOs)
+
+Fora (referenciados por ID):
+├── CustomerId ← Em agregado Customer separado
+├── ProductId ← Em agregado Product separado
+```
+
+**Razão:** Order deve ser consistente **dentro de si**. Customer e Product têm seu próprio ciclo de vida. **Domain Events** coordenam mudanças entre eles.
+
+### Exemplo: Invariante de Totais
 
 ```java
-public class ErrorMessages {
-    public static final String VALIDATION_ERROR_EMAIL_IS_INVALID = 
-        "Email is invalid";
-    public static final String ERROR_CUSTOMER_ARCHIVED = 
-        "Customer is archived it cannot be changed";
-
-    private ErrorMessages() {}  // Não instanciável
+private void recalculateTotals() {
+    // INVARIANTE: totalAmount = Sum(item.totalAmount)
+    // Isto é verificado e mantido automaticamente
+    Money total = items.stream()
+        .map(OrderItem::totalAmount)
+        .reduce(Money.ZERO, Money::add);
+    this.totalAmount = total;
 }
 ```
 
-**Benefício:** Mensagens centralizadas, fácil traduzir ou alterar.
+**Garantia:** Impossível `totalAmount` ficar fora de sincronia com os itens.
 
-## <a name="factories"></a>9. Factories
+## <a name="factories"></a>11. Factories e Builders
 
-### Conceito
-
-**Factory** encapsula lógica complexa de criação quando:
-- Criação envolve múltiplas etapas
-- Há variações do mesmo objeto
-- Criação requer contextos diferentes
-
-### Implementação com Builder e Static Factory Methods
-
-**Lombok @Builder** com **Static Factory Methods**:
-
-#### Na Entidade Customer
+Factory encapsula lógica complexa de criação. Implementação com **Lombok @Builder + Static Factory Methods**:
 
 ```java
 @Accessors(fluent = true)
 @Getter
 public class Customer {
-    // Builder para NOVO cliente
+    // Factory: novo cliente
     @Builder(builderClassName = "BrandNewCustomerBuild", builderMethodName = "brandNew")
-    private static Customer createBrandNew(
-            FullName fullName, BirthDate birthDate, Email email,
-            Phone phone, Document document, 
-            Boolean promotionNotificationsAllowed, Address address) {
-        return new Customer(
-                new CustomerId(),              // Gera UUID v7
+    private static Customer createBrandNew(FullName fullName, BirthDate birthDate, 
+                                           Email email, Phone phone, Document document,
+                                           Boolean promotionNotificationsAllowed, Address address) {
+        return new Customer(new CustomerId(),  // Gera UUID v7
                 fullName, birthDate, email, phone, document,
-                promotionNotificationsAllowed,
-                false,                         // Não arquivado
-                OffsetDateTime.now(),          // Registrado agora
-                null,                          // Sem data arquivamento
-                LoyaltyPoints.ZERO,            // Pontos = 0
-                address);
+                promotionNotificationsAllowed, false,  // não arquivado
+                OffsetDateTime.now(), null,
+                LoyaltyPoints.ZERO, address);
     }
 
-    // Builder para cliente EXISTENTE (reconstituição)
+    // Factory: cliente existente (reconstituição do banco)
     @Builder(builderClassName = "ExistingCustomerBuild", builderMethodName = "existing")
     private Customer(CustomerId id, FullName fullName, /* ... todos campos ... */) {
         // Inicializa todos os campos
@@ -593,127 +784,162 @@ public class Customer {
 }
 ```
 
-### Uso dos Builders
-
-#### Criar Novo Cliente
-
+**Uso:**
 ```java
+// Novo cliente
 Customer customer = Customer.brandNew()
     .fullName(new FullName("John", "Doe"))
-    .birthDate(new BirthDate(LocalDate.of(1991, 7, 5)))
-    .email(new Email("johndoe@email.com"))
-    .phone(new Phone("478-256-2604"))
-    .document(new Document("255-08-0578"))
-    .promotionNotificationsAllowed(true)
-    .address(Address.builder()
-            .street("Bourbon Street")
-            .number("1134")
-            .neighborhood("North Ville")
-            .city("York")
-            .state("South California")
-            .zipCode(new ZipCode("12345"))
-            .build())
+    .email(new Email("john@email.com"))
     .build();
-// ID, registeredAt, loyaltyPoints são preenchidos automaticamente
-```
 
-#### Reconstituir Cliente Existente
-
-```java
+// Reconstituir do banco
 Customer customer = Customer.existing()
     .id(new CustomerId(UUID.fromString("...")))
     .fullName(new FullName("John", "Doe"))
-    // ... todos os campos ...
     .loyaltyPoints(new LoyaltyPoints(150))
     .build();
-// Controle total - útil para reconstituição do banco
 ```
 
-### Test Data Builders
+### Factory com Lógica de Negócio
 
-Para testes, criamos builders pré-configurados:
+Às vezes é útil encapsular lógica complexa:
 
 ```java
-public class CustomerTestDataBuilder {
-    public static Customer.BrandNewCustomerBuild brandNewCustomer() {
-        return Customer.brandNew()
-                .fullName(new FullName("John", "Doe"))
-                .birthDate(new BirthDate(LocalDate.of(1991, 7, 5)))
-                .email(new Email("johndoe@email.com"))
-                .phone(new Phone("478-256-2604"))
-                .document(new Document("255-08-0578"))
-                .promotionNotificationsAllowed(true)
-                .address(Address.builder()
-                        .street("Bourbon Street")
-                        .number("1134")
-                        .neighborhood("North Ville")
-                        .city("York")
-                        .state("South California")
-                        .zipCode(new ZipCode("12345"))
-                        .build());
+public class OrderFactory {
+    public static Order filled(CustomerId customerId, Shipping shipping,
+                               Billing billing, PaymentMethod paymentMethod,
+                               ProductId productId, ProductName productName,
+                               Money price, Quantity quantity) {
+        Order order = Order.draft(customerId);
+        order.changeBilling(billing);
+        order.changeShipping(shipping);
+        order.changePaymentMethod(paymentMethod);
+        order.addItem(productId, productName, price, quantity);
+        return order;  // Pronta para ser colocada
     }
 }
 ```
 
-**Uso em testes:**
+### Test Data Builder
+
+Para testes, builders pré-configurados simplificam setup:
 
 ```java
+public class OrderTestDataBuilder {
+    public static Order.ExistingOrderBuilder completeOrder() {
+        return Order.existing()
+                .id(new OrderId())
+                .customerId(new CustomerId())
+                .status(OrderStatus.PLACED)
+                .totalAmount(new Money("100.00"))
+                .totalItems(new Quantity(2))
+                // ... resto dos campos pré-configurados
+                .items(new HashSet<>());
+    }
+}
+
+// Uso em teste
 @Test
-void testAddLoyaltyPoints() {
-    Customer customer = CustomerTestDataBuilder.brandNewCustomer().build();
-    
-    customer.addLoyaltyPoints(new LoyaltyPoints(10));
-    
-    assertThat(customer.loyaltyPoints()).isEqualTo(new LoyaltyPoints(10));
+void testChangeShipping() {
+    Order order = OrderTestDataBuilder.completeOrder().build();
+    // ... teste
 }
 ```
 
-### Benefícios
+**Benefícios:**
+- ✅ **Semântica clara** (`brandNew()` vs `existing()`)
+- ✅ **Type safety** (compilador garante campos)
+- ✅ **Flexibilidade** (controle total com `existing()`)
+- ✅ **Encapsulamento** (construtores privados)  
 
-✅ **Clareza Semântica** - `brandNew()` vs `existing()` expressa intenção  
-✅ **Type Safety** - compilador garante campos necessários  
-✅ **Conveniente** - menos parâmetros para novo cliente  
-✅ **Flexível** - `existing()` permite controle total  
-✅ **Testabilidade** - Test Data Builders simplificam testes  
+## <a name="transacoes"></a>12. Transações e Coordenação entre Agregados
 
-## 📝 Notas de Implementação
+### Princípio Fundamental: Uma Transação = Um Agregado
 
-### Por que não usar JPA `@Entity` na camada de domínio?
-
+❌ **Não faça** (multi-agregados em uma transação):
 ```java
-// ❌ NÃO MISTURAR
-@Entity  // ← Jakarta Persistence
-public class Customer { /* ... */ }
+@Transactional
+public void placeOrder(OrderId orderId, CustomerId customerId) {
+    Order order = orderRepository.findById(orderId);
+    Customer customer = customerRepository.findById(customerId);  // 2º agregado!
+    order.place();
+    customer.addLoyaltyPoints(new LoyaltyPoints(100));  // Viola princípio
+    orderRepository.save(order);
+    customerRepository.save(customer);
+}
+```
+**Problemas:** Lock em 2 tabelas, falha em um quebra o outro, difícil de paralelizar.
+
+✅ **Faça** (agregados isolados):
+```java
+@Transactional  // Transação 1: Order apenas
+public void placeOrder(OrderId orderId) {
+    Order order = orderRepository.findById(orderId);
+    order.place();
+    orderRepository.save(order);
+}  // Transação fecha aqui
+
+@Transactional  // Transação 2: Customer apenas
+public void addLoyaltyPoints(CustomerId customerId, @NonNull LoyaltyPoints points) {
+    Customer customer = customerRepository.findById(customerId);
+    customer.addLoyaltyPoints(points);
+    customerRepository.save(customer);
+}
 ```
 
-**Razão:** Domain Entity e Persistence Entity têm responsabilidades diferentes:
-- **Domain Entity**: Modela negócio, comportamentos e regras
-- **Persistence Entity**: Mapeia para banco de dados
+### Coordenação: Domain Events
 
-Isso mantém o domínio **independente do framework de persistência**.
+```java
+@Getter
+public class Order {
+    private List<DomainEvent> domainEvents = new ArrayList<>();
 
-### Por que Records para Value Objects?
+    public void place() {
+        verifyIfCanChangeToPlaced();
+        this.changeStatus(OrderStatus.PLACED);
+        // Publica evento (sem transação com Customer)
+        this.domainEvents.add(new OrderPlacedEvent(this.id(), this.customerId()));
+    }
+}
 
-Java Records (Java 14+) são perfeitos para VOs:
-- ✅ Imutáveis por padrão (`final`)
-- ✅ `equals()` e `hashCode()` automáticos
-- ✅ Construtor compacto (validações inline)
-- ✅ Menos boilerplate
-- ✅ Semântica clara ("data carriers")
+@EventListener  // Ouve evento em transação separada
+@Transactional
+public void onOrderPlaced(OrderPlacedEvent event) {
+    Customer customer = customerRepository.findById(event.customerId());
+    customer.addLoyaltyPoints(pointsForOrder(event));
+    customerRepository.save(customer);
+}
+```
+
+### Resumo: Boundaries
+
+| Aspecto | Dentro do Agregado | Entre Agregados |
+|---------|-------------------|-----------------|
+| Integridade | Garantida (ACID) | Eventual (eventos) |
+| Lock | Sim, 1 tabela | Não (mais rápido) |
+| Atomicidade | Garantida | Manual/compensação |
+
+Domain Events permitem **desacoplamento** entre agregados enquanto mantêm comunicação eficiente.
 
 ## 🎯 Resumo dos Padrões
 
 | Padrão | Implementação | Benefício |
 |--------|---------------|-----------|
-| **Rich Domain Model** | `Customer` com métodos | Lógica centralizada |
-| **Value Objects** | Records (Email, FullName) | Type safety + Validação |
+| **Rich Domain Model** | `Customer`, `Order` com métodos | Lógica centralizada |
+| **Aggregate Root** | `Order` como raiz de agregado | Integridade garantida |
+| **Value Objects** | Records (Email, Money, Quantity) | Type safety + Validação |
 | **Builder Pattern** | Lombok `@Builder` | Construção fluente |
-| **Static Factory Method** | `brandNew()` e `existing()` | Intenção clara |
-| **Test Data Builder** | `CustomerTestDataBuilder` | Testes simplificados |
-| **Domain Exceptions** | `CustomerArchivedException` | Erros específicos |
+| **Static Factory Method** | `brandNew()`, `existing()`, `draft()` | Intenção clara |
+| **Factory com Lógica** | `OrderFactory.filled()` | Agregado completo |
+| **Test Data Builder** | `OrderTestDataBuilder` | Testes simplificados |
+| **Domain Exceptions** | `OrderCannotBePlacedException` | Erros específicos |
+| **Imutable Collections** | `Collections.unmodifiableSet()` | Proteção de integridade |
+| **Invariantes** | Verificação em métodos | Consistência garantida |
+| **Single Responsibility** | Cada VO valida a si | Fail fast |
+| **Domain Events** | Comunicação entre agregados | Desacoplamento |
 | **Fluent Interface** | `@Accessors(fluent = true)` | API expressiva |
 | **Single Source of Truth** | `ErrorMessages` | Mensagens centralizadas |
-| **Fail Fast** | Validação no construtor | Detecção precoce |
+| **Transactional Boundary** | Uma transação = Um agregado | Performance + Simplicidade |
 
 ---
 

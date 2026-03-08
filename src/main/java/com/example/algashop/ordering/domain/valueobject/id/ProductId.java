@@ -1,13 +1,13 @@
-package com.example.algashop.ordering.domain.valueobject;
+package com.example.algashop.ordering.domain.valueobject.id;
 
 import com.example.algashop.ordering.domain.utility.IdGenerator;
 import lombok.NonNull;
 
 import java.util.UUID;
 
-public record CustomerId(@NonNull UUID value) {
+public record ProductId(@NonNull UUID value) {
 
-    public CustomerId() {
+    public ProductId() {
         this(IdGenerator.generateTimeBasedUUID());
     }
 

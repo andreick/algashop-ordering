@@ -2,13 +2,13 @@ package com.example.algashop.ordering.domain.entity;
 
 import com.example.algashop.ordering.domain.valueobject.Address;
 import com.example.algashop.ordering.domain.valueobject.BirthDate;
-import com.example.algashop.ordering.domain.valueobject.CustomerId;
 import com.example.algashop.ordering.domain.valueobject.Document;
 import com.example.algashop.ordering.domain.valueobject.Email;
 import com.example.algashop.ordering.domain.valueobject.FullName;
 import com.example.algashop.ordering.domain.valueobject.LoyaltyPoints;
 import com.example.algashop.ordering.domain.valueobject.Phone;
 import com.example.algashop.ordering.domain.valueobject.ZipCode;
+import com.example.algashop.ordering.domain.valueobject.id.CustomerId;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
