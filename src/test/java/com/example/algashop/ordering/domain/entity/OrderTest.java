@@ -1,6 +1,7 @@
 package com.example.algashop.ordering.domain.entity;
 
 import com.example.algashop.ordering.domain.exception.OrderCannotBeEditedException;
+import com.example.algashop.ordering.domain.exception.OrderDoesNotContainOrderItemException;
 import com.example.algashop.ordering.domain.exception.OrderInvalidShippingDeliveryDateException;
 import com.example.algashop.ordering.domain.exception.OrderStatusCannotBeChangedException;
 import com.example.algashop.ordering.domain.exception.ProductOutOfStockException;
@@ -11,6 +12,7 @@ import com.example.algashop.ordering.domain.valueobject.ProductName;
 import com.example.algashop.ordering.domain.valueobject.Quantity;
 import com.example.algashop.ordering.domain.valueobject.Shipping;
 import com.example.algashop.ordering.domain.valueobject.id.CustomerId;
+import com.example.algashop.ordering.domain.valueobject.id.OrderItemId;
 import com.example.algashop.ordering.domain.valueobject.id.ProductId;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -175,11 +177,52 @@ class OrderTest {
     void givenOutOfStockProduct_whenTryToAddToAnOrder_shouldNotAllow() {
         Order order = Order.draft(new CustomerId());
 
-        ThrowingCallable addItemTask = () -> order.addItem(
+        ThrowingCallable addItem = () -> order.addItem(
                 ProductTestDataBuilder.aProductUnavailable().build(),
                 new Quantity(1));
 
-        Assertions.assertThatExceptionOfType(ProductOutOfStockException.class).isThrownBy(addItemTask);
+        Assertions.assertThatExceptionOfType(ProductOutOfStockException.class).isThrownBy(addItem);
+    }
+
+    @Test
+    void givenDraftOrder_withTwoItems_whenRemoveItem_shouldRecalculateTotalsAndCount() {
+        Order order = OrderTestDataBuilder.anOrder().build();
+        int initialCount = order.items().size();
+        Money initialTotal = order.totalAmount();
+        Quantity initialItems = order.totalItems();
+
+        OrderItem itemToRemove = order.items().iterator().next();
+
+        order.removeItem(itemToRemove.id());
+
+        Assertions.assertThat(order.items()).hasSize(initialCount - 1);
+
+        Money expectedTotal = new Money(
+                initialTotal.value().subtract(itemToRemove.totalAmount().value()));
+        Quantity expectedQuantity = new Quantity(
+                initialItems.value() - itemToRemove.quantity().value());
+
+        Assertions.assertWith(order,
+                o -> Assertions.assertThat(o.totalAmount()).isEqualTo(expectedTotal),
+                o -> Assertions.assertThat(o.totalItems()).isEqualTo(expectedQuantity));
+    }
+
+    @Test
+    void givenDraftOrder_whenRemoveNonexistentItem_shouldThrow() {
+        Order order = OrderTestDataBuilder.anOrder().build();
+        OrderItemId fakeId = new OrderItemId();
+
+        Assertions.assertThatExceptionOfType(OrderDoesNotContainOrderItemException.class)
+                .isThrownBy(() -> order.removeItem(fakeId));
+    }
+
+    @Test
+    void givenPlacedOrder_whenRemoveItem_shouldThrowCannotBeEdited() {
+        Order order = OrderTestDataBuilder.anOrder().status(OrderStatus.PLACED).build();
+        OrderItem firstItem = order.items().iterator().next();
+
+        ThrowingCallable removeItem = () -> order.removeItem(firstItem.id());
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(removeItem);
     }
 
     @Test
