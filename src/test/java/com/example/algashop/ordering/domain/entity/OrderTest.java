@@ -1,5 +1,6 @@
 package com.example.algashop.ordering.domain.entity;
 
+import com.example.algashop.ordering.domain.exception.OrderCannotBeEditedException;
 import com.example.algashop.ordering.domain.exception.OrderInvalidShippingDeliveryDateException;
 import com.example.algashop.ordering.domain.exception.OrderStatusCannotBeChangedException;
 import com.example.algashop.ordering.domain.exception.ProductOutOfStockException;
@@ -12,7 +13,7 @@ import com.example.algashop.ordering.domain.valueobject.Shipping;
 import com.example.algashop.ordering.domain.valueobject.id.CustomerId;
 import com.example.algashop.ordering.domain.valueobject.id.ProductId;
 import org.assertj.core.api.Assertions;
-import org.assertj.core.api.ThrowableAssert;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -174,10 +175,43 @@ class OrderTest {
     void givenOutOfStockProduct_whenTryToAddToAnOrder_shouldNotAllow() {
         Order order = Order.draft(new CustomerId());
 
-        ThrowableAssert.ThrowingCallable addItemTask = () -> order.addItem(
+        ThrowingCallable addItemTask = () -> order.addItem(
                 ProductTestDataBuilder.aProductUnavailable().build(),
                 new Quantity(1));
 
         Assertions.assertThatExceptionOfType(ProductOutOfStockException.class).isThrownBy(addItemTask);
+    }
+
+    @Test
+    void givenPlacedOrder_whenTryToEdit_shouldThrowCannotBeEdited() {
+        Order order = OrderTestDataBuilder.anOrder().status(OrderStatus.PLACED).build();
+
+        ThrowingCallable changePaymentMethod = () -> order.changePaymentMethod(PaymentMethod.CREDIT_CARD);
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changePaymentMethod);
+
+        ThrowingCallable changeBilling = () -> order.changeBilling(OrderTestDataBuilder.aBilling());
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changeBilling);
+
+        ThrowingCallable changeShipping = () -> order.changeShipping(OrderTestDataBuilder.aShippingAlt());
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changeShipping);
+
+        // adding an item also should be forbidden once order is placed
+        ThrowingCallable addAfterPlaced = () -> order.addItem(ProductTestDataBuilder.aProduct().build(),
+                new Quantity(1));
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(addAfterPlaced);
+    }
+
+    @Test
+    void givenPaidOrder_whenTryToEdit_shouldThrowCannotBeEdited() {
+        Order order = OrderTestDataBuilder.anOrder().status(OrderStatus.PAID).build();
+
+        ThrowingCallable changePaymentMethod = () -> order.changePaymentMethod(PaymentMethod.CREDIT_CARD);
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changePaymentMethod);
+
+        ThrowingCallable changeBilling = () -> order.changeBilling(OrderTestDataBuilder.aBilling());
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changeBilling);
+
+        ThrowingCallable changeShipping = () -> order.changeShipping(OrderTestDataBuilder.aShippingAlt());
+        Assertions.assertThatExceptionOfType(OrderCannotBeEditedException.class).isThrownBy(changeShipping);
     }
 }

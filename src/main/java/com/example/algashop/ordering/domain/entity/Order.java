@@ -1,5 +1,6 @@
 package com.example.algashop.ordering.domain.entity;
 
+import com.example.algashop.ordering.domain.exception.OrderCannotBeEditedException;
 import com.example.algashop.ordering.domain.exception.OrderCannotBePlacedException;
 import com.example.algashop.ordering.domain.exception.OrderDoesNotContainOrderItemException;
 import com.example.algashop.ordering.domain.exception.OrderInvalidShippingDeliveryDateException;
@@ -89,6 +90,7 @@ public class Order {
     }
 
     public void addItem(@NonNull Product product, @NonNull Quantity quantity) {
+        this.verifyIfChangeable();
         product.checkOutOfStock();
 
         OrderItem orderItem = OrderItem.brandNew()
@@ -118,14 +120,18 @@ public class Order {
     }
 
     public void changePaymentMethod(@NonNull PaymentMethod paymentMethod) {
+        this.verifyIfChangeable();
         this.setPaymentMethod(paymentMethod);
     }
 
     public void changeBilling(@NonNull Billing billing) {
+        this.verifyIfChangeable();
         this.setBilling(billing);
     }
 
     public void changeShipping(@NonNull Shipping newShipping) {
+        this.verifyIfChangeable();
+
         if (newShipping.expectedDate().isBefore(LocalDate.now())) {
             throw new OrderInvalidShippingDeliveryDateException(this.id());
         }
@@ -134,6 +140,8 @@ public class Order {
     }
 
     public void changeItemQuantity(@NonNull OrderItemId orderItemId, @NonNull Quantity quantity) {
+        this.verifyIfChangeable();
+
         OrderItem orderItem = this.findOrderItem(orderItemId);
         orderItem.changeQuantity(quantity);
 
@@ -195,6 +203,12 @@ public class Order {
         }
         if (this.items() == null || this.items().isEmpty()) {
             throw OrderCannotBePlacedException.noItems(this.id());
+        }
+    }
+
+    private void verifyIfChangeable() {
+        if (!isDraft()) {
+            throw new OrderCannotBeEditedException(this.id(), this.status());
         }
     }
 
