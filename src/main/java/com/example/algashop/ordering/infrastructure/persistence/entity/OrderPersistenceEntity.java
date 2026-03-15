@@ -3,18 +3,20 @@ package com.example.algashop.ordering.infrastructure.persistence.entity;
 import com.example.algashop.ordering.infrastructure.persistence.embeddable.BillingEmbeddable;
 import com.example.algashop.ordering.infrastructure.persistence.embeddable.ShippingEmbeddable;
 import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.NonNull;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.data.annotation.CreatedBy;
@@ -24,14 +26,14 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @ToString(of = "id")
 @Table(name = "\"order\"")
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -94,4 +96,42 @@ public class OrderPersistenceEntity {
     @AttributeOverride(name = "address.state", column = @Column(name = "shipping_address_state"))
     @AttributeOverride(name = "address.zipCode", column = @Column(name = "shipping_address_zipCode"))
     private ShippingEmbeddable shipping;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private Set<OrderItemPersistenceEntity> items = new HashSet<>();
+
+    @Builder
+    public OrderPersistenceEntity(Long id, UUID customerId, BigDecimal totalAmount, Integer totalItems, String status,
+            String paymentMethod, OffsetDateTime placedAt, OffsetDateTime paidAt, OffsetDateTime canceledAt,
+            OffsetDateTime readyAt, UUID createdByUserId, OffsetDateTime lastModifiedAt, UUID lastModifiedByUserId,
+            Long version, BillingEmbeddable billing, ShippingEmbeddable shipping,
+            Set<OrderItemPersistenceEntity> items) {
+        this.id = id;
+        this.customerId = customerId;
+        this.totalAmount = totalAmount;
+        this.totalItems = totalItems;
+        this.status = status;
+        this.paymentMethod = paymentMethod;
+        this.placedAt = placedAt;
+        this.paidAt = paidAt;
+        this.canceledAt = canceledAt;
+        this.readyAt = readyAt;
+        this.createdByUserId = createdByUserId;
+        this.lastModifiedAt = lastModifiedAt;
+        this.lastModifiedByUserId = lastModifiedByUserId;
+        this.version = version;
+        this.billing = billing;
+        this.shipping = shipping;
+        this.replaceItems(items);
+    }
+
+    public void replaceItems(@NonNull Set<OrderItemPersistenceEntity> items) {
+        items.forEach(i -> i.setOrder(this));
+        this.items = items;
+    }
+
+    public void addItem(@NonNull OrderItemPersistenceEntity item) {
+        item.setOrder(this);
+        this.items.add(item);
+    }
 }
