@@ -9,11 +9,13 @@ import com.example.algashop.ordering.infrastructure.persistence.entity.OrderPers
 import com.example.algashop.ordering.infrastructure.persistence.repository.OrderPersistenceEntityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class OrdersPersistenceProvider implements Orders {
 
     private final OrderPersistenceEntityRepository persistenceRepository;
@@ -38,6 +40,7 @@ public class OrdersPersistenceProvider implements Orders {
     }
 
     @Override
+    @Transactional
     public void add(Order aggregateRoot) {
         long orderId = aggregateRoot.id().value().toLong();
 
