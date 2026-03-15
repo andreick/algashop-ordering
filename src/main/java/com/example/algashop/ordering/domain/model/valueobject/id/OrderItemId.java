@@ -7,7 +7,7 @@ import lombok.NonNull;
 public record OrderItemId(@NonNull TSID value) {
 
     public OrderItemId() {
-        this(IdGenerator.gererateTSID());
+        this(IdGenerator.generateTSID());
     }
 
     public OrderItemId(Long value) {

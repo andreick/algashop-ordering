@@ -28,7 +28,7 @@ import java.util.Set;
 
 @Accessors(fluent = true)
 @Getter
-public class Order {
+public class Order implements AggregateRoot<OrderId> {
 
     private OrderId id;
     private CustomerId customerId;
@@ -49,6 +49,8 @@ public class Order {
 
     private Set<OrderItem> items;
 
+    private Long version;
+
     @Builder(builderClassName = "ExistingOrderBuilder", builderMethodName = "existing")
     public Order(OrderId id, CustomerId customerId,
             Money totalAmount, Quantity totalItems,
@@ -56,7 +58,7 @@ public class Order {
             OffsetDateTime canceledAt, OffsetDateTime readyAt,
             Billing billing, Shipping shipping,
             OrderStatus status, PaymentMethod paymentMethod,
-            Set<OrderItem> items) {
+            Set<OrderItem> items, Long version) {
         this.setId(id);
         this.setCustomerId(customerId);
         this.setTotalAmount(totalAmount);
@@ -70,6 +72,7 @@ public class Order {
         this.setStatus(status);
         this.setPaymentMethod(paymentMethod);
         this.setItems(items);
+        this.setVersion(version);
     }
 
     public static Order draft(CustomerId customerId) {
@@ -86,7 +89,8 @@ public class Order {
                 null,
                 OrderStatus.DRAFT,
                 null,
-                new HashSet<>());
+                new HashSet<>(),
+                null);
     }
 
     public void addItem(@NonNull Product product, @NonNull Quantity quantity) {
@@ -302,6 +306,10 @@ public class Order {
     private void setItems(Set<OrderItem> items) {
         Objects.requireNonNull(items);
         this.items = items;
+    }
+
+    private void setVersion(Long version) {
+        this.version = version;
     }
 
     @Override

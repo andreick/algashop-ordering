@@ -7,7 +7,7 @@ import lombok.NonNull;
 public record ShoppingCartItemId(@NonNull TSID value) {
 
     public ShoppingCartItemId() {
-        this(IdGenerator.gererateTSID());
+        this(IdGenerator.generateTSID());
     }
 
     public ShoppingCartItemId(Long value) {
