@@ -3,6 +3,8 @@ package com.example.algashop.ordering.domain.model.repository;
 import com.example.algashop.ordering.domain.model.entity.Order;
 import com.example.algashop.ordering.domain.model.entity.OrderStatus;
 import com.example.algashop.ordering.domain.model.entity.OrderTestDataBuilder;
+import com.example.algashop.ordering.domain.model.entity.ProductTestDataBuilder;
+import com.example.algashop.ordering.domain.model.valueobject.Quantity;
 import com.example.algashop.ordering.domain.model.valueobject.id.OrderId;
 import com.example.algashop.ordering.infrastructure.persistence.assembler.OrderPersistenceEntityAssembler;
 import com.example.algashop.ordering.infrastructure.persistence.disassembler.OrderPersistenceEntityDisassembler;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,6 +26,7 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
+@Sql(statements = { "DELETE FROM order_item", "DELETE FROM \"order\"" })
 @Import({ OrdersPersistenceProvider.class,
         OrderPersistenceEntityAssembler.class,
         OrderPersistenceEntityDisassembler.class })
@@ -127,6 +131,89 @@ class OrdersIT {
 
         Assertions.assertThat(savedOrder.canceledAt()).isNull();
         Assertions.assertThat(savedOrder.paidAt()).isNotNull();
+    }
+
+    @Test
+    void shouldCountExistingOrders() {
+        Assertions.assertThat(orders.count()).isZero();
+
+        Order order1 = OrderTestDataBuilder.anOrder().build();
+        Order order2 = OrderTestDataBuilder.anOrder().build();
+
+        orders.add(order1);
+        orders.add(order2);
+
+        Assertions.assertThat(orders.count()).isEqualTo(2L);
+    }
+
+    @Test
+    void shouldReturnIfOrderExists() {
+        Order order = OrderTestDataBuilder.anOrder().build();
+        orders.add(order);
+
+        Assertions.assertThat(orders.exists(order.id())).isTrue();
+        Assertions.assertThat(orders.exists(new OrderId())).isFalse();
+    }
+
+    @Test
+    void shouldRemovePersistenceEntityItemsBetweenTransactions() {
+        OrderId orderId = inNewTransaction(() -> {
+            Order order = OrderTestDataBuilder.anOrder().withItems(true).build();
+            orders.add(order);
+            return order.id();
+        });
+
+        inNewTransaction(() -> {
+            Order order = orders.ofId(orderId).orElseThrow();
+            order.items().stream()
+                    .map(i -> i.id())
+                    .toList()
+                    .forEach(order::removeItem);
+            orders.add(order);
+        });
+
+        Order updatedOrder = inNewTransaction(() -> orders.ofId(orderId).orElseThrow());
+        Assertions.assertThat(updatedOrder.items()).isEmpty();
+    }
+
+    @Test
+    void shouldAddItemsToPersistenceEntityBetweenTransactions() {
+        OrderId orderId = inNewTransaction(() -> {
+            Order order = OrderTestDataBuilder.anOrder().withItems(false).build();
+            orders.add(order);
+            return order.id();
+        });
+
+        inNewTransaction(() -> {
+            Order order = orders.ofId(orderId).orElseThrow();
+            order.addItem(ProductTestDataBuilder.aProduct().build(), new Quantity(2));
+            order.addItem(ProductTestDataBuilder.aProductAltRamMemory().build(), new Quantity(1));
+            orders.add(order);
+        });
+
+        Order updatedOrder = inNewTransaction(() -> orders.ofId(orderId).orElseThrow());
+        Assertions.assertThat(updatedOrder.items()).hasSize(2);
+    }
+
+    @Test
+    void shouldRemoveMergedItemCorrectlyBetweenTransactions() {
+        OrderId orderId = inNewTransaction(() -> {
+            Order order = OrderTestDataBuilder.anOrder().withItems(true).build();
+            orders.add(order);
+            return order.id();
+        });
+
+        var removedItemId = inNewTransaction(() -> {
+            Order order = orders.ofId(orderId).orElseThrow();
+            var orderItemId = order.items().iterator().next().id();
+            order.removeItem(orderItemId);
+            orders.add(order);
+            return orderItemId;
+        });
+
+        Order updatedOrder = inNewTransaction(() -> orders.ofId(orderId).orElseThrow());
+        Assertions.assertThat(updatedOrder.items()).hasSize(1);
+        Assertions.assertThat(updatedOrder.items()).noneMatch(i -> i.id().equals(removedItemId));
     }
 
     private <T> T inNewTransaction(Supplier<T> callback) {

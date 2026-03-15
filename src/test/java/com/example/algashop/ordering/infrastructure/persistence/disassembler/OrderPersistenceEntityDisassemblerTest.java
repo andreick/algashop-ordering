@@ -5,6 +5,7 @@ import com.example.algashop.ordering.domain.model.entity.OrderStatus;
 import com.example.algashop.ordering.domain.model.entity.PaymentMethod;
 import com.example.algashop.ordering.domain.model.valueobject.Money;
 import com.example.algashop.ordering.domain.model.valueobject.Quantity;
+import com.example.algashop.ordering.domain.model.valueobject.Shipping;
 import com.example.algashop.ordering.domain.model.valueobject.id.CustomerId;
 import com.example.algashop.ordering.domain.model.valueobject.id.OrderId;
 import com.example.algashop.ordering.infrastructure.persistence.entity.OrderPersistenceEntity;
@@ -20,18 +21,96 @@ class OrderPersistenceEntityDisassemblerTest {
     @Test
     void shouldConvertFromPersistence() {
         OrderPersistenceEntity persistenceEntity = OrderPersistenceEntityTestDataBuilder.existingOrder().build();
+
         Order domainEntity = disassembler.toDomainEntity(persistenceEntity);
-        assertThat(domainEntity).satisfies(
-                s -> assertThat(s.id()).isEqualTo(new OrderId(persistenceEntity.getId())),
-                s -> assertThat(s.customerId()).isEqualTo(new CustomerId(persistenceEntity.getCustomerId())),
-                s -> assertThat(s.totalAmount()).isEqualTo(new Money(persistenceEntity.getTotalAmount())),
-                s -> assertThat(s.totalItems()).isEqualTo(new Quantity(persistenceEntity.getTotalItems())),
-                s -> assertThat(s.placedAt()).isEqualTo(persistenceEntity.getPlacedAt()),
-                s -> assertThat(s.paidAt()).isEqualTo(persistenceEntity.getPaidAt()),
-                s -> assertThat(s.canceledAt()).isEqualTo(persistenceEntity.getCanceledAt()),
-                s -> assertThat(s.readyAt()).isEqualTo(persistenceEntity.getReadyAt()),
-                s -> assertThat(s.status()).isEqualTo(OrderStatus.valueOf(persistenceEntity.getStatus())),
-                s -> assertThat(s.paymentMethod())
-                        .isEqualTo(PaymentMethod.valueOf(persistenceEntity.getPaymentMethod())));
+
+        assertThat(domainEntity).isNotNull();
+        assertThat(domainEntity)
+                .extracting(
+                        Order::id,
+                        Order::customerId,
+                        Order::totalAmount,
+                        Order::totalItems,
+                        Order::placedAt,
+                        Order::paidAt,
+                        Order::canceledAt,
+                        Order::readyAt,
+                        Order::status,
+                        Order::paymentMethod)
+                .containsExactly(
+                        new OrderId(persistenceEntity.getId()),
+                        new CustomerId(persistenceEntity.getCustomerId()),
+                        new Money(persistenceEntity.getTotalAmount()),
+                        new Quantity(persistenceEntity.getTotalItems()),
+                        persistenceEntity.getPlacedAt(),
+                        persistenceEntity.getPaidAt(),
+                        persistenceEntity.getCanceledAt(),
+                        persistenceEntity.getReadyAt(),
+                        OrderStatus.valueOf(persistenceEntity.getStatus()),
+                        PaymentMethod.valueOf(persistenceEntity.getPaymentMethod()));
+
+        assertThat(domainEntity.billing())
+                .extracting(
+                        b -> b.fullName().firstName(),
+                        b -> b.fullName().lastName(),
+                        b -> b.document().value(),
+                        b -> b.phone().value(),
+                        b -> b.email().value(),
+                        b -> b.address().street(),
+                        b -> b.address().number(),
+                        b -> b.address().complement())
+                .containsExactly(
+                        persistenceEntity.getBilling().getFirstName(),
+                        persistenceEntity.getBilling().getLastName(),
+                        persistenceEntity.getBilling().getDocument(),
+                        persistenceEntity.getBilling().getPhone(),
+                        persistenceEntity.getBilling().getEmail(),
+                        persistenceEntity.getBilling().getAddress().getStreet(),
+                        persistenceEntity.getBilling().getAddress().getNumber(),
+                        persistenceEntity.getBilling().getAddress().getComplement());
+
+        assertThat(domainEntity.shipping())
+                .extracting(
+                        Shipping::cost,
+                        Shipping::expectedDate,
+                        sh -> sh.address().street(),
+                        sh -> sh.address().number(),
+                        sh -> sh.address().complement(),
+                        sh -> sh.recipient().fullName().firstName(),
+                        sh -> sh.recipient().fullName().lastName(),
+                        sh -> sh.recipient().document().value(),
+                        sh -> sh.recipient().phone().value())
+                .containsExactly(
+                        new Money(persistenceEntity.getShipping().getCost()),
+                        persistenceEntity.getShipping().getExpectedDate(),
+                        persistenceEntity.getShipping().getAddress().getStreet(),
+                        persistenceEntity.getShipping().getAddress().getNumber(),
+                        persistenceEntity.getShipping().getAddress().getComplement(),
+                        persistenceEntity.getShipping().getRecipient().getFirstName(),
+                        persistenceEntity.getShipping().getRecipient().getLastName(),
+                        persistenceEntity.getShipping().getRecipient().getDocument(),
+                        persistenceEntity.getShipping().getRecipient().getPhone());
+
+        assertThat(domainEntity.items()).hasSameSizeAs(persistenceEntity.getItems());
+    }
+
+    @Test
+    void shouldMapNullWhenBillingIsNull() {
+        OrderPersistenceEntity persistenceEntity = OrderPersistenceEntityTestDataBuilder.existingOrder()
+                .billing(null)
+                .build();
+        Order domainEntity = disassembler.toDomainEntity(persistenceEntity);
+
+        assertThat(domainEntity.billing()).isNull();
+    }
+
+    @Test
+    void shouldMapNullWhenShippingIsNull() {
+        OrderPersistenceEntity persistenceEntity = OrderPersistenceEntityTestDataBuilder.existingOrder()
+                .shipping(null)
+                .build();
+        Order domainEntity = disassembler.toDomainEntity(persistenceEntity);
+
+        assertThat(domainEntity.shipping()).isNull();
     }
 }
