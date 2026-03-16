@@ -9,6 +9,8 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
@@ -43,7 +45,10 @@ public class OrderPersistenceEntity {
     @Id
     @EqualsAndHashCode.Include
     private Long id;
-    private UUID customerId;
+
+    @JoinColumn
+    @ManyToOne(optional = false)
+    private CustomerPersistenceEntity customer;
 
     private BigDecimal totalAmount;
     private Integer totalItems;
@@ -102,13 +107,13 @@ public class OrderPersistenceEntity {
     private Set<OrderItemPersistenceEntity> items = new HashSet<>();
 
     @Builder
-    public OrderPersistenceEntity(Long id, UUID customerId, BigDecimal totalAmount, Integer totalItems, String status,
-            String paymentMethod, OffsetDateTime placedAt, OffsetDateTime paidAt, OffsetDateTime canceledAt,
-            OffsetDateTime readyAt, UUID createdByUserId, OffsetDateTime lastModifiedAt, UUID lastModifiedByUserId,
-            Long version, BillingEmbeddable billing, ShippingEmbeddable shipping,
+    public OrderPersistenceEntity(Long id, CustomerPersistenceEntity customer, BigDecimal totalAmount,
+            Integer totalItems, String status, String paymentMethod, OffsetDateTime placedAt, OffsetDateTime paidAt,
+            OffsetDateTime canceledAt, OffsetDateTime readyAt, UUID createdByUserId, OffsetDateTime lastModifiedAt,
+            UUID lastModifiedByUserId, Long version, BillingEmbeddable billing, ShippingEmbeddable shipping,
             Set<OrderItemPersistenceEntity> items) {
         this.id = id;
-        this.customerId = customerId;
+        this.customer = customer;
         this.totalAmount = totalAmount;
         this.totalItems = totalItems;
         this.status = status;
@@ -138,5 +143,9 @@ public class OrderPersistenceEntity {
     public void addItem(@NonNull OrderItemPersistenceEntity item) {
         item.setOrder(this);
         this.items.add(item);
+    }
+
+    public UUID getCustomerId() {
+        return this.customer != null ? this.customer.getId() : null;
     }
 }

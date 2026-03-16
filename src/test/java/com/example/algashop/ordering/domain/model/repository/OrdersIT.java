@@ -1,15 +1,20 @@
 package com.example.algashop.ordering.domain.model.repository;
 
+import com.example.algashop.ordering.domain.model.entity.CustomerTestDataBuilder;
 import com.example.algashop.ordering.domain.model.entity.Order;
 import com.example.algashop.ordering.domain.model.entity.OrderStatus;
 import com.example.algashop.ordering.domain.model.entity.OrderTestDataBuilder;
 import com.example.algashop.ordering.domain.model.entity.ProductTestDataBuilder;
 import com.example.algashop.ordering.domain.model.valueobject.Quantity;
 import com.example.algashop.ordering.domain.model.valueobject.id.OrderId;
+import com.example.algashop.ordering.infrastructure.persistence.assembler.CustomerPersistenceEntityAssembler;
 import com.example.algashop.ordering.infrastructure.persistence.assembler.OrderPersistenceEntityAssembler;
+import com.example.algashop.ordering.infrastructure.persistence.disassembler.CustomerPersistenceEntityDisassembler;
 import com.example.algashop.ordering.infrastructure.persistence.disassembler.OrderPersistenceEntityDisassembler;
+import com.example.algashop.ordering.infrastructure.persistence.provider.CustomersPersistenceProvider;
 import com.example.algashop.ordering.infrastructure.persistence.provider.OrdersPersistenceProvider;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -27,19 +32,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @Sql(statements = { "DELETE FROM order_item", "DELETE FROM \"order\"" })
-@Import({ OrdersPersistenceProvider.class,
-        OrderPersistenceEntityAssembler.class,
-        OrderPersistenceEntityDisassembler.class })
+@Import({
+        OrdersPersistenceProvider.class, OrderPersistenceEntityAssembler.class,
+        OrderPersistenceEntityDisassembler.class, CustomersPersistenceProvider.class,
+        CustomerPersistenceEntityAssembler.class, CustomerPersistenceEntityDisassembler.class
+})
 class OrdersIT {
 
     private final Orders orders;
+    private final Customers customers;
     private final TransactionTemplate newTransaction;
 
     @Autowired
-    public OrdersIT(Orders orders, PlatformTransactionManager transactionManager) {
+    public OrdersIT(Orders orders, Customers customers, PlatformTransactionManager transactionManager) {
         this.orders = orders;
+        this.customers = customers;
         this.newTransaction = new TransactionTemplate(transactionManager);
         this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    @BeforeEach
+    void setup() {
+        if (!customers.exists(CustomerTestDataBuilder.DEFAULT_CUSTOMER_ID)) {
+            inNewTransaction(() -> customers.add(CustomerTestDataBuilder.existingCustomer().build()));
+        }
     }
 
     @Test
