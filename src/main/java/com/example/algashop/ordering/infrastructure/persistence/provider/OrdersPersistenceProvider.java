@@ -3,6 +3,8 @@ package com.example.algashop.ordering.infrastructure.persistence.provider;
 import com.example.algashop.ordering.domain.model.entity.Order;
 import com.example.algashop.ordering.domain.model.repository.Orders;
 import com.example.algashop.ordering.domain.model.repository.VersionSynchronizer;
+import com.example.algashop.ordering.domain.model.valueobject.Money;
+import com.example.algashop.ordering.domain.model.valueobject.id.CustomerId;
 import com.example.algashop.ordering.domain.model.valueobject.id.OrderId;
 import com.example.algashop.ordering.infrastructure.persistence.assembler.OrderPersistenceEntityAssembler;
 import com.example.algashop.ordering.infrastructure.persistence.disassembler.OrderPersistenceEntityDisassembler;
@@ -12,7 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Year;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -39,6 +44,25 @@ public class OrdersPersistenceProvider implements Orders {
     @Override
     public long count() {
         return persistenceRepository.count();
+    }
+
+    @Override
+    public List<Order> placedByCustomerInYear(CustomerId customerId, Year year) {
+        List<OrderPersistenceEntity> entities = persistenceRepository.placedByCustomerInYear(
+                customerId.value(),
+                year.getValue());
+
+        return entities.stream().map(disassembler::toDomainEntity).collect(Collectors.toList());
+    }
+
+    @Override
+    public long salesQuantityByCustomerInYear(CustomerId customerId, Year year) {
+        return this.persistenceRepository.salesQuantityByCustomerInYear(customerId.value(), year.getValue());
+    }
+
+    @Override
+    public Money totalSoldForCustomer(CustomerId customerId) {
+        return new Money(this.persistenceRepository.totalSoldForCustomer(customerId.value()));
     }
 
     @Override
