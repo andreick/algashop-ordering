@@ -15,7 +15,8 @@ Fundamentos de **Domain-Driven Design (DDD)** aplicados à implementação do do
 9. [Exceções de Domínio](#excecoes)
 10. [Princípios de Tamanho e Consistência](#invariantes)
 11. [Factories e Builders](#factories)
-12. [Transações e Coordenação entre Agregados](#transacoes)
+12. [Repository Pattern no Domínio](#repository)
+13. [Transações e Coordenação entre Agregados](#transacoes)
 
 ## <a name="introducao"></a>1. Introdução ao Domain-Driven Design
 
@@ -852,7 +853,36 @@ void testChangeShipping() {
 - ✅ **Flexibilidade** (controle total com `existing()`)
 - ✅ **Encapsulamento** (construtores privados)  
 
-## <a name="transacoes"></a>12. Transações e Coordenação entre Agregados
+## <a name="repository"></a>12. Repository Pattern
+
+No DDD puro, **Repository é um contrato do domínio**, não uma tecnologia.
+
+O papel do repository no domínio é:
+
+- Prover uma abstração de acesso a agregados
+- Esconder detalhes de persistência da regra de negócio
+- Permitir que casos de uso dependam de interface, não de framework
+
+Exemplos reais do projeto:
+
+```java
+public interface Customers extends Repository<Customer, CustomerId> {
+    Optional<Customer> ofEmail(Email email);
+    boolean isEmailUnique(Email email, CustomerId exceptCustomerId);
+}
+```
+
+```java
+public interface Orders extends Repository<Order, OrderId> {
+    List<Order> placedByCustomerInYear(CustomerId customerId, Year year);
+    long salesQuantityByCustomerInYear(CustomerId customerId, Year year);
+    Money totalSoldForCustomer(CustomerId customerId);
+}
+```
+
+Na arquitetura deste projeto, as implementações desses contratos ficam fora do domínio, na infraestrutura.
+
+## <a name="transacoes"></a>13. Transações e Coordenação entre Agregados
 
 ### Princípio Fundamental: Uma Transação = Um Agregado
 
@@ -931,6 +961,7 @@ Domain Events permitem **desacoplamento** entre agregados enquanto mantêm comun
 | **Builder Pattern** | Lombok `@Builder` | Construção fluente |
 | **Static Factory Method** | `brandNew()`, `existing()`, `draft()` | Intenção clara |
 | **Factory com Lógica** | `OrderFactory.filled()` | Agregado completo |
+| **Repository Pattern** | `Customers`, `Orders` (interfaces de domínio) | Persistência desacoplada do domínio |
 | **Test Data Builder** | `OrderTestDataBuilder` | Testes simplificados |
 | **Domain Exceptions** | `OrderCannotBePlacedException` | Erros específicos |
 | **Imutable Collections** | `Collections.unmodifiableSet()` | Proteção de integridade |
@@ -940,7 +971,3 @@ Domain Events permitem **desacoplamento** entre agregados enquanto mantêm comun
 | **Fluent Interface** | `@Accessors(fluent = true)` | API expressiva |
 | **Single Source of Truth** | `ErrorMessages` | Mensagens centralizadas |
 | **Transactional Boundary** | Uma transação = Um agregado | Performance + Simplicidade |
-
----
-
-**📚 Este documento evolui junto com o projeto. Última atualização:** Março 2026
