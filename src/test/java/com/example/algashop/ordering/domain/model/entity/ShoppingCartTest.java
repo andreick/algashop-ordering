@@ -50,7 +50,7 @@ class ShoppingCartTest {
         ShoppingCartItem item = cart.items().iterator().next();
         assertThat(item.quantity()).isEqualTo(new Quantity(3));
         assertThat(item.price()).isEqualTo(prod.price());
-        assertThat(item.available()).isEqualTo(prod.inStock());
+        assertThat(item.isAvailable()).isEqualTo(prod.inStock());
         assertThat(cart.totalItems()).isEqualTo(new Quantity(3));
         assertThat(cart.totalAmount()).isEqualTo(prod.price().multiply(new Quantity(3)));
     }
@@ -72,7 +72,7 @@ class ShoppingCartTest {
 
     @Test
     void removeNonexistentItem_shouldThrow() {
-        ShoppingCart cart = ShoppingCartTestDataBuilder.anEmptyCart().build();
+        ShoppingCart cart = ShoppingCartTestDataBuilder.aShoppingCart().build();
 
         ThrowingCallable removeNonexistentItem = () -> cart.removeItem(new ShoppingCartItemId());
         assertThatExceptionOfType(ShoppingCartDoesNotContainItemException.class).isThrownBy(removeNonexistentItem);
@@ -80,7 +80,7 @@ class ShoppingCartTest {
 
     @Test
     void empty_shouldClearAll() {
-        ShoppingCart cart = ShoppingCartTestDataBuilder.anEmptyCart()
+        ShoppingCart cart = ShoppingCartTestDataBuilder.aShoppingCart()
                 .withItem(ProductTestDataBuilder.aProduct().build(), new Quantity(1))
                 .withItem(ProductTestDataBuilder.aProductAltRamMemory().build(), new Quantity(2))
                 .build();
@@ -94,7 +94,7 @@ class ShoppingCartTest {
 
     @Test
     void refreshItem_withUnknownProduct_shouldThrow() {
-        ShoppingCart cart = ShoppingCartTestDataBuilder.anEmptyCart()
+        ShoppingCart cart = ShoppingCartTestDataBuilder.aShoppingCart()
                 .withItem(ProductTestDataBuilder.aProduct().build(), new Quantity(1))
                 .build();
 

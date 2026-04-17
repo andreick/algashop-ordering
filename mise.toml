@@ -1,6 +1,10 @@
 [tools]
 java = "temurin-21"
 
+[tasks.check]
+description = "Run Gradle wrapper check"
+run = '''./gradlew check'''
+
 [tasks.test]
 description = "Run Gradle wrapper unit tests"
 usage = '''

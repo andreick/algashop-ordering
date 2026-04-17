@@ -32,7 +32,7 @@ public class ShoppingCartItem {
     private ProductId productId;
 
     @NonNull
-    private ProductName productName;
+    private ProductName name;
 
     @NonNull
     private Money price;
@@ -44,7 +44,7 @@ public class ShoppingCartItem {
     private Money totalAmount;
 
     @NonNull
-    private Boolean available;
+    private Boolean isAvailable;
 
     @Builder(builderClassName = "BrandNewShoppingCartItemBuilder", builderMethodName = "brandNew")
     private static ShoppingCartItem createBrandNew(ShoppingCartId shoppingCartId, Product product,
@@ -68,11 +68,11 @@ public class ShoppingCartItem {
         this.id(id);
         this.shoppingCartId(shoppingCartId);
         this.productId(productId);
-        this.productName(productName);
+        this.name(productName);
         this.price(price);
         this.quantity(quantity);
         this.totalAmount(totalAmount);
-        this.available(available);
+        this.isAvailable(available);
     }
 
     public ShoppingCartItem quantity(@NonNull Quantity quantity) {
@@ -88,9 +88,9 @@ public class ShoppingCartItem {
             throw new ShoppingCartItemIncompatibleProductException(this.id(), product.id());
         }
 
-        this.productName(product.name());
+        this.name(product.name());
         this.price(product.price());
-        this.available(product.inStock());
+        this.isAvailable(product.inStock());
         recalculateTotals();
     }
 

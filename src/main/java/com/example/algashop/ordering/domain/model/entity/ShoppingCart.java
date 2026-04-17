@@ -25,7 +25,7 @@ import java.util.Set;
 @Getter
 @Setter(value = lombok.AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class ShoppingCart {
+public class ShoppingCart implements AggregateRoot<ShoppingCartId> {
 
     @EqualsAndHashCode.Include
     @NonNull
@@ -45,6 +45,8 @@ public class ShoppingCart {
 
     @NonNull
     private Set<ShoppingCartItem> items;
+
+    private Long version;
 
     public static ShoppingCart startShopping(CustomerId customerId) {
         return new ShoppingCart(
@@ -109,7 +111,7 @@ public class ShoppingCart {
     }
 
     public boolean containsUnavailableItems() {
-        return this.items.stream().anyMatch(item -> !item.available());
+        return this.items.stream().anyMatch(item -> !item.isAvailable());
     }
 
     public boolean isEmpty() {
