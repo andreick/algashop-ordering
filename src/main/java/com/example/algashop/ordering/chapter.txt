@@ -1,0 +1,49 @@
+8 Repositories e infraestrutura de persistência
+
+8.1. Repository Pattern
+
+O Repository Pattern é uma coleção de objetos do domínio em memória que simula uma coleção de objetos persistidos. Ele fornece uma interface para acessar os dados, permitindo que a lógica de negócios interaja com os dados sem se preocupar com os detalhes de como eles são armazenados ou recuperados.
+Um Repository pertence a um Aggregate Root.
+
+Benefícios do Repository Pattern:
+- Abstração da camada de persistência
+- Promove um design mais limpo e organizado
+- Separa o modelo de domínio da tecnologia de persistência
+- Facilita a manutenção, evolução e testes do código
+
+8.2. Persistence Model e Domain Model
+8.3. Definindo um Repository no Domain Model
+8.4. Soluções para persistência: Jakarta Persistence e Spring Data JPA
+8.5. Preparando dependências do projeto
+8.6. Implementando Persistence Model
+8.7. Como testar a persistência?
+8.8. Isolando execução dos testes de integração
+8.9. Testando modelo de persistência com testes de integração
+8.10. Otimizando testes de persistência com @DataJpaTest
+8.11. Persistindo um Aggregate
+8.12. Assembler: Conversor de Domain Entity para Jakarta Persistence Entity
+8.13. Disassembler: Conversor de Jakarta Persistence Entity para Domain Entity
+8.14. Reconstituição: Entendendo a recuperação do estado de um Aggregate
+8.15. Implementando propriedades únicas para o modelo de persistência
+8.16. Atualizando o estado de um Aggregate
+8.17. O problema da concorrência
+8.18. Optimistic Locking
+8.19. Implementando Optimistic Lock
+8.20. Protegendo alterações indevidas de Version
+8.21. Definindo propriedades compostas usando @Embbeded
+8.22. Integrando Embeddable e Entity
+8.23. Exercício: Copiando dados dos Value Objects para Embeddables
+8.24. Exercício: Reconstituindo Value Objects compostos
+8.25. Persistindo Entities em cascata
+8.26. Mesclando dados dos itens de um pedido
+8.27. Exercício: Continue a implementação do Disassembler
+8.28. Consultas para informações resumidas
+8.29. Problema do Lazy Loading
+8.30. Desafio: Implemente persistência para Customer
+8.31. Relacionando entidades de persistência
+8.32. Consultas com filtros
+8.33. Consultas para listagens
+8.34. Criando consultas com JPQL
+8.35. Consultas para somas e contagens com filtros
+8.36. Consultas ligadas a verificações
+8.37. Desafio: Implemente persistência para Shopping Cart
