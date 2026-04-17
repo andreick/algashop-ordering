@@ -1,0 +1,34 @@
+[tools]
+java = "temurin-21"
+
+[tasks.test]
+description = "Run Gradle wrapper unit tests"
+usage = '''
+arg "[test-class]" help="Optional fully-qualified test class name or pattern"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${usage_test_class:-}" ]]; then
+  ./gradlew test --tests "${usage_test_class}"
+else
+  ./gradlew test
+fi
+'''
+
+[tasks.integration-test]
+description = "Run Gradle wrapper integration tests"
+usage = '''
+arg "[test-class]" help="Optional fully-qualified integration test class name or pattern"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${usage_test_class:-}" ]]; then
+  ./gradlew integrationTest --tests "${usage_test_class}"
+else
+  ./gradlew integrationTest
+fi
+'''
