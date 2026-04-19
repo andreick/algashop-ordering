@@ -115,6 +115,11 @@ public class Customer implements AggregateRoot<CustomerId> {
         this.setPhone(phone);
     }
 
+    public void changeAddress(Address address) {
+        verifyIfChangeable();
+        this.setAddress(address);
+    }
+
     private void setId(CustomerId id) {
         Objects.requireNonNull(id);
         this.id = id;
