@@ -1,0 +1,41 @@
+package com.example.algashop.ordering.domain.model.customer;
+
+import com.example.algashop.ordering.domain.model.DomainService;
+import com.example.algashop.ordering.domain.model.commons.Money;
+import com.example.algashop.ordering.domain.model.order.CantAddLoyaltyPointsOrderIsNotReady;
+import com.example.algashop.ordering.domain.model.order.Order;
+import com.example.algashop.ordering.domain.model.order.OrderNotBelongsToCustomerException;
+import lombok.NonNull;
+
+@DomainService
+public class CustomerLoyaltyPointsService {
+
+    private static final LoyaltyPoints basePoints = new LoyaltyPoints(5);
+
+    private static final Money expectedAmountToGivePoints = new Money("1000");
+
+    public void addPoints(@NonNull Customer customer, @NonNull Order order) {
+        if (!customer.id().equals(order.customerId())) {
+            throw new OrderNotBelongsToCustomerException();
+        }
+
+        if (!order.isReady()) {
+            throw new CantAddLoyaltyPointsOrderIsNotReady();
+        }
+
+        customer.addLoyaltyPoints(calculatePoints(order));
+    }
+
+    private LoyaltyPoints calculatePoints(Order order) {
+        if (shouldGivePointsByAmount(order.totalAmount())) {
+            Money result = order.totalAmount().divide(expectedAmountToGivePoints);
+            return new LoyaltyPoints(result.value().intValue() * basePoints.value());
+        }
+
+        return LoyaltyPoints.ZERO;
+    }
+
+    private boolean shouldGivePointsByAmount(Money amount) {
+        return amount.compareTo(expectedAmountToGivePoints) >= 0;
+    }
+}

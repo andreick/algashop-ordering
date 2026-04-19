@@ -1,0 +1,5 @@
+11. Modularização dirigida pelo domínio
+
+11.1. Introdução aos Modules
+11.2. Organizando módulos do domínio
+11.3. Modules aplicados na camada de infrastructure
