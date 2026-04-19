@@ -1,0 +1,22 @@
+9. Domain Services
+
+9.1. Introdução aos Services
+9.2. Entendendo o Domain Service Pattern
+
+- Gerenciam operações de negócio e suas regras
+- Trabalham com tipos do domínio
+- Não guardam estado
+- Não gerenciam transações
+- Não dependem de casos de uso da aplicação
+- Podem ser interfaces
+- Não é recomendável persistir dados
+
+9.3. Desenvolvendo um Domain Service
+9.4. Desenvolvendo o Domain Service para registro de Customer
+9.5. Usando Mockito para testar um Domain Service
+9.6. Domain Service para consulta de Product
+9.7. Como lidar com atualizações em massa
+9.8. Usar Annotations do Spring ou não
+9.9. Desafio - Implemente o Domain Service para Checkout
+9.10. Desafio - Implemente o Domain Service de BuyNow
+9.11. Desafio - Implemente o Domain Service para ShoppingCart
