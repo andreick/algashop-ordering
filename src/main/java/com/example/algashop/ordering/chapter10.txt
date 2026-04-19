@@ -1,0 +1,7 @@
+10. Integração entre Bounded Contexts e Anti-corruption Layer (ACL)
+
+10.1. ACL e integração entre contextos
+10.2. Domain Service e ACL para calcular frete
+10.3. Domain Service para buscar endereço AlgaShop
+10.4. API da Rapi-Dex com WireMock
+10.5. Integração com Spring RestClient

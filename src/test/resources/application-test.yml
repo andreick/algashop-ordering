@@ -12,3 +12,8 @@ spring:
   test:
     database:
       replace: none
+
+algashop:
+  integrations:
+    shipping.provider: "FAKE"
+    rapidex.url: "http://localhost:8780"
