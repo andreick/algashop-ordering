@@ -1,0 +1,21 @@
+12. Application Services e a camada de Application
+
+12.1. Application Services Pattern
+
+- Orquestram os casos de uso e fluxos da aplicação, protegendo a camada de domínio.
+- São uma ponte entre a camada de apresentação (controllers) e a camada de domínio (services, aggregates).
+- Gerenciam a lógica de aplicação, como transações, segurança, e coordenação de chamadas a serviços de domínio.
+
+12.2. Application Service para casos de uso de Customer
+12.3. Consulta de dados
+12.4. Modularização na camada de Application
+12.5. Mapeadores automáticos com ModelMapper
+12.6. Customizando mapeamento de propriedades
+12.7. Implementando caso de uso de atualização de Customer
+12.8. Implementando caso de uso compra instantânea
+12.9. Desafio - Implemente o arquivamento de Customer
+12.10. Desafio - Implemente alteração de email para Customer
+12.11. Desafio - Application Service para adição de Loyalty Points
+12.12. Desafio - Application Service para gestão de Shopping Cart
+12.13. Desafio - Application Service para gestão de Order
+12.14. Desafio - Application Service para Checkout

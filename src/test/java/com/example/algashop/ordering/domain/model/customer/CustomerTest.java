@@ -21,7 +21,7 @@ class CustomerTest {
 		customer.archive();
 
 		assertWith(customer,
-				c -> assertThat(c.fullName()).isEqualTo(new FullName("Anonymous", "Customer")),
+				c -> assertThat(c.fullName()).isEqualTo(new FullName("Anonymous", "Anonymous")),
 				c -> assertThat(c.email()).isNotEqualTo(new Email("john.doe@gmail.com")),
 				c -> assertThat(c.phone()).isEqualTo(new Phone("000-000-0000")),
 				c -> assertThat(c.document()).isEqualTo(new Document("000-00-0000")),
