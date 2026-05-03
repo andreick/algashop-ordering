@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Year;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -48,7 +47,7 @@ public class OrdersPersistenceProvider implements Orders {
                 customerId.value(),
                 year.getValue());
 
-        return entities.stream().map(disassembler::toDomainEntity).collect(Collectors.toList());
+        return entities.stream().map(disassembler::toDomainEntity).toList();
     }
 
     @Override
@@ -69,11 +68,13 @@ public class OrdersPersistenceProvider implements Orders {
         persistenceRepository.findById(orderId)
                 .ifPresentOrElse(persistenceEntity -> update(aggregateRoot, persistenceEntity),
                         () -> insert(aggregateRoot));
+
+        aggregateRoot.clearDomainEvents();
     }
 
     private void update(Order aggregateRoot, OrderPersistenceEntity persistenceEntity) {
         assembler.merge(persistenceEntity, aggregateRoot);
-        persistenceRepository.flush();
+        persistenceRepository.saveAndFlush(persistenceEntity);
         versionSynchronizer.synchronizeVersion(aggregateRoot, persistenceEntity.getVersion());
     }
 

@@ -3,6 +3,7 @@ package com.example.algashop.ordering.application.customer.loyaltypoints;
 import com.example.algashop.ordering.domain.model.commons.Email;
 import com.example.algashop.ordering.domain.model.commons.Money;
 import com.example.algashop.ordering.domain.model.commons.Quantity;
+import com.example.algashop.ordering.domain.model.customer.CantAddLoyaltyPointsOrderIsNotReady;
 import com.example.algashop.ordering.domain.model.customer.Customer;
 import com.example.algashop.ordering.domain.model.customer.CustomerArchivedException;
 import com.example.algashop.ordering.domain.model.customer.CustomerId;
@@ -10,7 +11,6 @@ import com.example.algashop.ordering.domain.model.customer.CustomerNotFoundExcep
 import com.example.algashop.ordering.domain.model.customer.CustomerTestDataBuilder;
 import com.example.algashop.ordering.domain.model.customer.Customers;
 import com.example.algashop.ordering.domain.model.customer.LoyaltyPoints;
-import com.example.algashop.ordering.domain.model.order.CantAddLoyaltyPointsOrderIsNotReady;
 import com.example.algashop.ordering.domain.model.order.Order;
 import com.example.algashop.ordering.domain.model.order.OrderNotBelongsToCustomerException;
 import com.example.algashop.ordering.domain.model.order.OrderNotFoundException;
@@ -19,11 +19,13 @@ import com.example.algashop.ordering.domain.model.order.OrderTestDataBuilder;
 import com.example.algashop.ordering.domain.model.order.Orders;
 import com.example.algashop.ordering.domain.model.product.Product;
 import com.example.algashop.ordering.domain.model.product.ProductTestDataBuilder;
+import com.example.algashop.ordering.infrastructure.listener.customer.CustomerEventListener;
 import io.hypersistence.tsid.TSID;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -40,6 +42,9 @@ class CustomerLoyaltyPointsApplicationServiceIT {
 
     @Autowired
     private Orders orders;
+
+    @MockitoBean
+    private CustomerEventListener customerEventListener;
 
     @Test
     void shouldAddLoyaltyPointsToCustomerWhenOrderIsValidAndReady() {

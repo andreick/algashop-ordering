@@ -40,6 +40,7 @@ public class OrderPersistenceEntityAssembler {
         orderPersistenceEntity.setBilling(toBillingEmbeddable(order.billing()));
         orderPersistenceEntity.setShipping(toShippingEmbeddable(order.shipping()));
         mergeItems(order, orderPersistenceEntity);
+        orderPersistenceEntity.addEvents(order.domainEvents());
         return orderPersistenceEntity;
     }
 

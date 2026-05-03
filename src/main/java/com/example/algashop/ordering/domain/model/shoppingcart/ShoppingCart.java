@@ -1,5 +1,6 @@
 package com.example.algashop.ordering.domain.model.shoppingcart;
 
+import com.example.algashop.ordering.domain.model.AbstractEventSourceEntity;
 import com.example.algashop.ordering.domain.model.AggregateRoot;
 import com.example.algashop.ordering.domain.model.commons.Money;
 import com.example.algashop.ordering.domain.model.commons.Quantity;
@@ -21,8 +22,8 @@ import java.util.Set;
 @Accessors(fluent = true)
 @Getter
 @Setter(value = lombok.AccessLevel.PRIVATE)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class ShoppingCart implements AggregateRoot<ShoppingCartId> {
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
+public class ShoppingCart extends AbstractEventSourceEntity implements AggregateRoot<ShoppingCartId> {
 
     @EqualsAndHashCode.Include
     @NonNull
@@ -46,8 +47,13 @@ public class ShoppingCart implements AggregateRoot<ShoppingCartId> {
     private Long version;
 
     public static ShoppingCart startShopping(CustomerId customerId) {
-        return new ShoppingCart(
-                new ShoppingCartId(), customerId, Money.ZERO, Quantity.ZERO, OffsetDateTime.now(), new HashSet<>());
+        ShoppingCart shoppingCart = new ShoppingCart(new ShoppingCartId(), customerId, Money.ZERO,
+                Quantity.ZERO, OffsetDateTime.now(), new HashSet<>());
+        shoppingCart.publishDomainEvent(new ShoppingCartCreatedEvent(
+                shoppingCart.id(),
+                shoppingCart.customerId(),
+                shoppingCart.createdAt()));
+        return shoppingCart;
     }
 
     @Builder(builderClassName = "ShoppingCartBuilder", builderMethodName = "existing")
@@ -69,6 +75,10 @@ public class ShoppingCart implements AggregateRoot<ShoppingCartId> {
         this.items(new HashSet<>());
         this.totalAmount(Money.ZERO);
         this.totalItems(Quantity.ZERO);
+        this.publishDomainEvent(new ShoppingCartEmptiedEvent(
+                this.id(),
+                this.customerId(),
+                OffsetDateTime.now()));
     }
 
     public void addItem(@NonNull Product product, @NonNull Quantity quantity) {
@@ -86,13 +96,25 @@ public class ShoppingCart implements AggregateRoot<ShoppingCartId> {
                     .build();
             this.items.add(shoppingCartItem);
         }
+
         recalculateTotals();
+
+        this.publishDomainEvent(new ShoppingCartItemAddedEvent(
+                this.id(),
+                this.customerId(),
+                product.id(),
+                OffsetDateTime.now()));
     }
 
     public void removeItem(@NonNull ShoppingCartItemId shoppingCartItemId) {
         ShoppingCartItem shoppingCartItem = findItem(shoppingCartItemId);
         this.items.remove(shoppingCartItem);
         recalculateTotals();
+        this.publishDomainEvent(new ShoppingCartItemRemovedEvent(
+                this.id(),
+                this.customerId(),
+                shoppingCartItem.productId(),
+                OffsetDateTime.now()));
     }
 
     public void refreshItem(@NonNull Product product) {

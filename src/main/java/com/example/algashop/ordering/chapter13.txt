@@ -1,0 +1,36 @@
+13. Domain Events
+
+13.1. Domain Event Pattern
+
+Evento = Fato importante + Ferramenta de modelagem
+Anti-padrão: Eventos CRUD
+Não crie eventos, os descubra!
+
+Domain Event Pattern:
+- Nome deve ser uma sentença no passado
+- Nomeado conforme a linguagem ubiqua do domínio
+- Representam fatos importantes
+- São imutáveis
+- Gerados por agregados
+
+Propriedades:
+- Data e hora do evento
+- ID do agregado que gerou o evento
+- Payload com dados relevantes para o evento
+
+Recomendações:
+- Não inclua objetos complexos no payload
+- Não inclua muitos dados nem dados externos ao agregado
+
+13.2. Modelando eventos de Customer
+13.3. Implementando evento de Customer Registered
+13.4. Implementando o evento de Customer Archived
+13.5. Implementando infraestrutura para publicação de eventos
+13.6. Escutando eventos com EventListener
+13.7. Garantindo escuta de eventos com Mockito Spy
+13.8. Reagindo a eventos
+13.9. Enriquecendo eventos
+13.10. Modelando eventos de Order
+13.12. Implementando o processamento de Loyalty Points
+13.13. Modelando eventos de Shopping Cart
+13.14. Desafio: Implemento os eventos de Shopping Cart

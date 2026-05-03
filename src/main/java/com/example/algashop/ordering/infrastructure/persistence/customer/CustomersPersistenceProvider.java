@@ -55,10 +55,13 @@ public class CustomersPersistenceProvider implements Customers {
         persistenceRepository.findById(customerId)
                 .ifPresentOrElse(persistenceEntity -> update(aggregateRoot, persistenceEntity),
                         () -> insert(aggregateRoot));
+
+        aggregateRoot.clearDomainEvents();
     }
 
     private void update(Customer aggregateRoot, CustomerPersistenceEntity persistenceEntity) {
         assembler.merge(persistenceEntity, aggregateRoot);
+        persistenceRepository.saveAndFlush(persistenceEntity);
     }
 
     private void insert(Customer aggregateRoot) {

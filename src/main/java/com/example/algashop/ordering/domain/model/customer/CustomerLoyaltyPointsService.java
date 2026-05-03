@@ -2,7 +2,6 @@ package com.example.algashop.ordering.domain.model.customer;
 
 import com.example.algashop.ordering.domain.model.DomainService;
 import com.example.algashop.ordering.domain.model.commons.Money;
-import com.example.algashop.ordering.domain.model.order.CantAddLoyaltyPointsOrderIsNotReady;
 import com.example.algashop.ordering.domain.model.order.Order;
 import com.example.algashop.ordering.domain.model.order.OrderNotBelongsToCustomerException;
 import lombok.NonNull;

@@ -60,11 +60,13 @@ public class ShoppingCartsPersistenceProvider implements ShoppingCarts {
                 .ifPresentOrElse(
                         persistenceEntity -> update(aggregateRoot, persistenceEntity),
                         () -> insert(aggregateRoot));
+
+        aggregateRoot.clearDomainEvents();
     }
 
     private void update(ShoppingCart aggregateRoot, ShoppingCartPersistenceEntity persistenceEntity) {
         assembler.merge(persistenceEntity, aggregateRoot);
-        persistenceRepository.flush();
+        persistenceRepository.saveAndFlush(persistenceEntity);
     }
 
     private void insert(ShoppingCart aggregateRoot) {
