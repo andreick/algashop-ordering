@@ -152,6 +152,7 @@ public class Order implements AggregateRoot<OrderId> {
         }
 
         this.setShipping(newShipping);
+        this.recalculateTotals();
     }
 
     public void changeItemQuantity(@NonNull OrderItemId orderItemId, @NonNull Quantity quantity) {
