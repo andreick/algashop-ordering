@@ -1,29 +1,45 @@
 package com.example.algashop.ordering.domain.model.order;
 
 import com.example.algashop.ordering.domain.model.DomainService;
+import com.example.algashop.ordering.domain.model.commons.Money;
 import com.example.algashop.ordering.domain.model.commons.Quantity;
-import com.example.algashop.ordering.domain.model.customer.CustomerId;
+import com.example.algashop.ordering.domain.model.customer.Customer;
 import com.example.algashop.ordering.domain.model.product.Product;
+import lombok.RequiredArgsConstructor;
 
 @DomainService
+@RequiredArgsConstructor
 public class BuyNowService {
 
-	public Order buyNow(Product product,
-			CustomerId customerId,
-			Billing billing,
-			Shipping shipping,
-			Quantity quantity,
-			PaymentMethod paymentMethod) {
+    private final CustomerHaveFreeShippingSpecification customerHaveFreeShippingSpecification;
 
-		product.checkOutOfStock();
+    public Order buyNow(Product product,
+            Customer customer,
+            Billing billing,
+            Shipping shipping,
+            Quantity quantity,
+            PaymentMethod paymentMethod) {
 
-		Order order = Order.draft(customerId);
-		order.changeBilling(billing);
-		order.changeShipping(shipping);
-		order.changePaymentMethod(paymentMethod);
-		order.addItem(product, quantity);
-		order.place();
+        product.checkOutOfStock();
 
-		return order;
-	}
+        Order order = Order.draft(customer.id());
+        order.changeBilling(billing);
+        order.changePaymentMethod(paymentMethod);
+        order.addItem(product, quantity);
+
+        if (haveFreeShipping(customer)) {
+            Shipping freeShipping = shipping.toBuilder().cost(Money.ZERO).build();
+            order.changeShipping(freeShipping);
+        } else {
+            order.changeShipping(shipping);
+        }
+
+        order.place();
+
+        return order;
+    }
+
+    private boolean haveFreeShipping(Customer customer) {
+        return customerHaveFreeShippingSpecification.isSatisfiedBy(customer);
+    }
 }

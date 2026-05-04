@@ -1,0 +1,11 @@
+14. Specifications
+
+14.1. Domain Specification Pattern
+
+Recomendado para regras de negócio complexas, regras que mudam frequentemente e regras que precisam de customização.
+Torna o código mais legível, testável, fácil de entender e manter.
+
+14.2. Implementando regra para frete grátis
+14.3. Implementando Specification parametrizável
+14.4. Implementando Specification composta
+14.5. Utilizando Specification no Checkout Service

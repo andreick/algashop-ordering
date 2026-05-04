@@ -1,6 +1,9 @@
 package com.example.algashop.ordering.application.checkout;
 
 import com.example.algashop.ordering.domain.model.commons.ZipCode;
+import com.example.algashop.ordering.domain.model.customer.Customer;
+import com.example.algashop.ordering.domain.model.customer.CustomerNotFoundException;
+import com.example.algashop.ordering.domain.model.customer.Customers;
 import com.example.algashop.ordering.domain.model.order.CheckoutService;
 import com.example.algashop.ordering.domain.model.order.Order;
 import com.example.algashop.ordering.domain.model.order.Orders;
@@ -20,40 +23,44 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class CheckoutApplicationService {
 
-	private final Orders orders;
-	private final ShoppingCarts shoppingCarts;
-	private final CheckoutService checkoutService;
+    private final Orders orders;
+    private final ShoppingCarts shoppingCarts;
+    private final Customers customers;
 
-	private final BillingInputDisassembler billingInputDisassembler;
-	private final ShippingInputDisassembler shippingInputDisassembler;
+    private final CheckoutService checkoutService;
 
-	private final ShippingCostService shippingCostService;
-	private final OriginAddressService originAddressService;
+    private final BillingInputDisassembler billingInputDisassembler;
+    private final ShippingInputDisassembler shippingInputDisassembler;
 
-	@Transactional
-	public String checkout(@NonNull CheckoutInput input) {
-		PaymentMethod paymentMethod = PaymentMethod.valueOf(input.getPaymentMethod());
+    private final ShippingCostService shippingCostService;
+    private final OriginAddressService originAddressService;
 
-		ShoppingCartId shoppingCartId = new ShoppingCartId(input.getShoppingCartId());
-		ShoppingCart shoppingCart = shoppingCarts.ofId(shoppingCartId)
-				.orElseThrow(ShoppingCartNotFoundException::new);
+    @Transactional
+    public String checkout(@NonNull CheckoutInput input) {
+        PaymentMethod paymentMethod = PaymentMethod.valueOf(input.getPaymentMethod());
 
-		var shippingCalculationResult = calculateShippingCost(input.getShipping());
+        ShoppingCartId shoppingCartId = new ShoppingCartId(input.getShoppingCartId());
+        ShoppingCart shoppingCart = shoppingCarts.ofId(shoppingCartId)
+                .orElseThrow(ShoppingCartNotFoundException::new);
 
-		Order order = checkoutService.checkout(shoppingCart,
-				billingInputDisassembler.toDomainModel(input.getBilling()),
-				shippingInputDisassembler.toDomainModel(input.getShipping(), shippingCalculationResult),
-				paymentMethod);
+        Customer customer = customers.ofId(shoppingCart.customerId()).orElseThrow(CustomerNotFoundException::new);
 
-		orders.add(order);
-		shoppingCarts.add(shoppingCart);
+        var shippingCalculationResult = calculateShippingCost(input.getShipping());
 
-		return order.id().toString();
-	}
+        Order order = checkoutService.checkout(customer, shoppingCart,
+                billingInputDisassembler.toDomainModel(input.getBilling()),
+                shippingInputDisassembler.toDomainModel(input.getShipping(), shippingCalculationResult),
+                paymentMethod);
 
-	private ShippingCostService.CalculationResult calculateShippingCost(ShippingInput shipping) {
-		ZipCode origin = originAddressService.originAddress().zipCode();
-		ZipCode destination = new ZipCode(shipping.getAddress().getZipCode());
-		return shippingCostService.calculate(new ShippingCostService.CalculationRequest(origin, destination));
-	}
+        orders.add(order);
+        shoppingCarts.add(shoppingCart);
+
+        return order.id().toString();
+    }
+
+    private ShippingCostService.CalculationResult calculateShippingCost(ShippingInput shipping) {
+        ZipCode origin = originAddressService.originAddress().zipCode();
+        ZipCode destination = new ZipCode(shipping.getAddress().getZipCode());
+        return shippingCostService.calculate(new ShippingCostService.CalculationRequest(origin, destination));
+    }
 }
