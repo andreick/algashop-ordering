@@ -1,6 +1,8 @@
 package com.example.algashop.ordering.application.checkout;
 
 import com.example.algashop.ordering.application.commons.AddressData;
+import com.example.algashop.ordering.application.order.query.BillingData;
+import com.example.algashop.ordering.application.order.query.RecipientData;
 
 import java.util.UUID;
 

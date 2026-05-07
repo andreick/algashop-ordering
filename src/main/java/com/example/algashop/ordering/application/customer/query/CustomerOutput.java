@@ -1,4 +1,4 @@
-package com.example.algashop.ordering.application.customer.management;
+package com.example.algashop.ordering.application.customer.query;
 
 import com.example.algashop.ordering.application.commons.AddressData;
 import lombok.AllArgsConstructor;
@@ -15,7 +15,6 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 public class CustomerOutput {
-
     private UUID id;
     private String firstName;
     private String lastName;

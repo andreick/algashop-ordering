@@ -1,0 +1,15 @@
+15. Command Query Responsibility Segregation (CQRS)
+
+15.1. O que é CQRS?
+15.2. Separando componentes de consultas e comandos em Customer
+15.3. Otimizando consulta de Customer com JPQL
+15.4. Implementação simplificada com Entity Manager
+15.5. Modelo de leitura detalhado para Order
+15.6. Implementando consulta detalhada para Order
+15.7. Consulta paginada para Order com Criteria API
+15.8. Definindo filtros e ordenação
+15.9. Filtrando Order por Customer
+15.10. Adicionado mais filtros para Order
+15.11. Implementando ordenação
+15.12. Desafio: Consulta de clientes
+15.13. Desafio: Consulta de carrinhos

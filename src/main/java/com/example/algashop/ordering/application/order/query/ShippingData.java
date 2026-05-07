@@ -1,17 +1,21 @@
-package com.example.algashop.ordering.application.checkout;
+package com.example.algashop.ordering.application.order.query;
 
 import com.example.algashop.ordering.application.commons.AddressData;
-import com.example.algashop.ordering.application.order.query.RecipientData;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class ShippingInput {
+public class ShippingData {
+    private BigDecimal cost;
+    private LocalDate expectedDate;
     private RecipientData recipient;
     private AddressData address;
 }

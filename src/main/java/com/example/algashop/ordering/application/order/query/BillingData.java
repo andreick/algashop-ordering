@@ -1,4 +1,4 @@
-package com.example.algashop.ordering.application.checkout;
+package com.example.algashop.ordering.application.order.query;
 
 import com.example.algashop.ordering.application.commons.AddressData;
 import lombok.AllArgsConstructor;

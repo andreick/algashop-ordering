@@ -1,6 +1,8 @@
 package com.example.algashop.ordering.application.customer.management;
 
 import com.example.algashop.ordering.application.customer.notification.CustomerNotificationApplicationService;
+import com.example.algashop.ordering.application.customer.query.CustomerOutput;
+import com.example.algashop.ordering.application.customer.query.CustomerQueryService;
 import com.example.algashop.ordering.domain.model.customer.CustomerArchivedEvent;
 import com.example.algashop.ordering.domain.model.customer.CustomerArchivedException;
 import com.example.algashop.ordering.domain.model.customer.CustomerNotFoundException;
@@ -30,6 +32,9 @@ class CustomerManagementApplicationServiceIT {
     @MockitoSpyBean
     private CustomerNotificationApplicationService customerNotificationApplicationService;
 
+    @Autowired
+    private CustomerQueryService queryService;
+
     @Test
     void shouldRegister() {
         CustomerInput input = CustomerInputTestDataBuilder.aCustomer().build();
@@ -37,7 +42,7 @@ class CustomerManagementApplicationServiceIT {
         UUID customerId = customerManagementApplicationService.create(input);
         Assertions.assertThat(customerId).isNotNull();
 
-        CustomerOutput customerOutput = customerManagementApplicationService.findById(customerId);
+        CustomerOutput customerOutput = queryService.findById(customerId);
 
         Assertions.assertThat(customerOutput)
                 .extracting(
@@ -61,9 +66,8 @@ class CustomerManagementApplicationServiceIT {
         Mockito.verify(customerEventListener, Mockito.never())
                 .listen(Mockito.any(CustomerArchivedEvent.class));
 
-        Mockito.verify(customerNotificationApplicationService)
-                .notifyNewRegistration(Mockito.any(
-                        CustomerNotificationApplicationService.NotifyNewRegistrationInput.class));
+        Mockito.verify(customerNotificationApplicationService).notifyNewRegistration(
+                Mockito.any(CustomerNotificationApplicationService.NotifyNewRegistrationInput.class));
     }
 
     @Test
@@ -76,7 +80,7 @@ class CustomerManagementApplicationServiceIT {
 
         customerManagementApplicationService.update(customerId, updateInput);
 
-        CustomerOutput customerOutput = customerManagementApplicationService.findById(customerId);
+        CustomerOutput customerOutput = queryService.findById(customerId);
 
         Assertions.assertThat(customerOutput)
                 .extracting(
@@ -103,7 +107,7 @@ class CustomerManagementApplicationServiceIT {
 
         customerManagementApplicationService.archive(customerId);
 
-        CustomerOutput archivedCustomer = customerManagementApplicationService.findById(customerId);
+        CustomerOutput archivedCustomer = queryService.findById(customerId);
 
         Assertions.assertThat(archivedCustomer)
                 .isNotNull()

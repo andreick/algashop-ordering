@@ -1,5 +1,6 @@
 package com.example.algashop.ordering.application.checkout;
 
+import com.example.algashop.ordering.application.order.query.BillingData;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,8 +13,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder
 public class CheckoutInput {
-	private UUID shoppingCartId;
-	private String paymentMethod;
-	private ShippingInput shipping;
-	private BillingData billing;
+    private UUID shoppingCartId;
+    private String paymentMethod;
+    private ShippingInput shipping;
+    private BillingData billing;
 }
