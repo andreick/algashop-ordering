@@ -1,12 +1,11 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.5.11'
+	id 'org.springframework.boot' version '3.5.14'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.example.algashop'
 version = '0.0.1-SNAPSHOT'
-description = 'Demo project for Spring Boot'
 
 java {
 	toolchain {
@@ -15,13 +14,13 @@ java {
 }
 
 configurations {
+	all {
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
 	compileOnly {
 		extendsFrom annotationProcessor
 	}
 	mockitoAgent
-	all {
-        exclude group: 'commons-logging', module: 'commons-logging'
-    }
 }
 
 repositories {
@@ -29,21 +28,23 @@ repositories {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+
 	implementation 'com.fasterxml.uuid:java-uuid-generator:5.2.0'
 	implementation 'commons-validator:commons-validator:1.10.1'
 	implementation 'io.hypersistence:hypersistence-tsid:2.1.4'
 	implementation 'org.modelmapper:modelmapper:3.2.4'
-	runtimeOnly 'com.h2database:h2'
+
 	compileOnly 'org.projectlombok:lombok'
+	runtimeOnly 'com.h2database:h2'
 	annotationProcessor 'org.projectlombok:lombok'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.assertj:assertj-core:3.27.7'
-	mockitoAgent('org.mockito:mockito-core') {
-		transitive = false
-	}
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	mockitoAgent('org.mockito:mockito-core') { transitive = false }
 }
 
 tasks.withType(Test).configureEach {
