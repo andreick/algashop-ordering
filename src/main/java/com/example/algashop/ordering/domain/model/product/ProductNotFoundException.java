@@ -1,6 +1,6 @@
 package com.example.algashop.ordering.domain.model.product;
 
-import com.example.algashop.ordering.domain.model.DomainException;
+import com.example.algashop.ordering.domain.model.DomainEntityNotFoundException;
 
-public class ProductNotFoundException extends DomainException {
+public class ProductNotFoundException extends DomainEntityNotFoundException {
 }

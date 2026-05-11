@@ -1,0 +1,15 @@
+3. Implementação de REST API com testes de contrato
+
+3.1. Testes de contrato
+Existem duas abordagens:
+- Contrat Testing (Tradicional)
+- Consumer Driven Contract Testing (CDC)
+
+3.2. Testando endpoint de criação de cliente
+3.3. Usando Mock no teste de contrato
+3.4. Testes para erros de requisição
+3.5. Testes com paginação
+3.6. Avaliando Location Header
+3.7. Testes com Path dinâmico
+3.8. Aprimorando tratamento de erros para Exceptions
+3.9. Desafio: Desenvolva e teste o contrato do recurso de clientes
